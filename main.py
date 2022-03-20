@@ -35,6 +35,11 @@ def read_item_details(path="./data/items.xlsx"):
     return item_objects
 
 
+def read_data(demands_path="Demand.csv"):
+    demand = pd.read_csv(demands_path)
+    print(demand.head())
+
+
 if __name__ == "__main__":
     # max_speed and drone counts will come from parameters
     """
