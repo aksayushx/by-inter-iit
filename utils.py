@@ -44,4 +44,22 @@ class Item:
 
 
 
+class Demand:
+    def __init__(self,wh,demand_id,item,day,x,y,z,del_from,del_to,failure):
+
+        self.wh=wh
+        self.demand_id=demand_id
+        self.item=item
+        self.day=day
+        self.x=x
+        self.y=y
+        self.z=z
+        self.del_from=del_from
+        self.del_to=del_to
+        self.failure=failure
+
+
+
+
+
 
