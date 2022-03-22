@@ -1,3 +1,4 @@
+from cv2 import inRange
 import pandas as pd
 import numpy as np
 
@@ -57,6 +58,57 @@ class Demand:
         self.del_from=del_from
         self.del_to=del_to
         self.failure=failure
+
+
+class NoFlyZone:
+    def __init__(self,points) -> None:
+        self.points=points
+        self.mn=np.min(np.array(points),axis=0)
+        self.mx=np.max(np.array(points),axis=0)
+        print(self.mx)
+        print(self.mn)
+    
+    def inRange(self,a,b,c):
+        return c>=a and c<=b
+
+    def doesIntersect(self,a,b):
+        if a[0]==b[0]:
+            return inRange(self.mn[0],self.mx[0],a[0])
+        if a[1]==b[1]:
+            return inRange(self.mn[1],self.mn[1],a[1])
+            
+        # Put x 
+        y=a[1]+((b[1]-a[1])*(self.mn[0]-a[0]))/(b[0]-a[0])
+        if inRange(self.mn[1],self.mx[1],y):
+            return True
+
+        y=a[1]+((b[1]-a[1])*(self.mx[0]-a[0]))/(b[0]-a[0])
+        if inRange(self.mn[1],self.mx[1],y):
+            return True
+
+        # Put y
+        x=a[0]+((b[0]-a[0])*(self.mn[1]-a[1]))/(b[1]-a[1])
+        if inRange(self.mn[0],self.mx[0],x):
+            return True
+
+        x=a[0]+((b[0]-a[0])*(self.mx[1]-a[1]))/(b[1]-a[1])
+        if inRange(self.mn[0],self.mx[0],x):
+            return True
+
+        return False
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,4 +1,4 @@
-from utils import Drone,Item,Demand
+from utils import Drone,Item,Demand,NoFlyZone
 import pandas as pd
 import numpy as np
 from string import ascii_uppercase
@@ -25,6 +25,8 @@ DB=[0.,0.,0.,0.,0.,0.]
 DC=[0.,0.,0.,0.,0.,0.]
 #Demands
 demands=[]
+#No fly zones
+noflyzones=[]
 
 
 def read_drone_details(path="./data/drone.xlsx", max_speed=10):
@@ -121,6 +123,20 @@ def process_params(param_path="data/Parameters.csv"):
     DB[i-1]=b
     DC[i-1]=c
     drone_count[i-1]=count
+
+  for idx in range(1,3):
+    zone=[]
+    for i in range(1,9):
+      df=parameters.loc[parameters['Parameter_ID']=='X'+str(idx)+str(i),'Value']
+      if df.empty:
+        break
+      x=parameters.loc[parameters['Parameter_ID']=='X'+str(idx)+str(i),'Value'].iloc[0]
+      y=parameters.loc[parameters['Parameter_ID']=='Y'+str(idx)+str(i),'Value'].iloc[0]
+      z=parameters.loc[parameters['Parameter_ID']=='Z'+str(idx)+str(i),'Value'].iloc[0]
+      zone.append([x,y,z])
+    if len(zone)>0:
+      noflyzones.append(NoFlyZone(zone))
+    
 
 if __name__ == "__main__":
   process_params()
