@@ -28,6 +28,8 @@ DC=[0.,0.,0.,0.,0.,0.]
 demands=[]
 #No fly zones
 noflyzones=[]
+# Number of nofly zones
+n=0
 
 def read_drone_details(path="./data/drone.xlsx", max_speed=10):
     drone_df = pd.read_excel(path)
@@ -179,6 +181,112 @@ def process_params(param_path="data/Parameters.csv"):
     if len(zone)>0:
       noflyzones.append(NoFlyZone(zone))
     
+    n=len(noflyzones)
+
+
+def pathCoordinates(src,dest):
+  """
+  Return exact drone coornates for goinf from src to dest on straight line
+  """
+  pass  
+
+def getPath(src,dest):
+
+  best_path=[]
+  min_cost=1e18
+  for z in range(0,201):
+    pres_cost=0.0
+    cor=src
+    ok=True
+    path=[src]
+    if src[2]!=z:
+      cor=[src[0],src[1],z]
+      path.append(cor)
+    for i in range(0,n):
+      if not noflyzones[i].doesIntersect(cor,[dest[0],dest[1],z]):
+        pass
+      else:
+        ok=False
+        break
+    if not ok:
+      continue
+    path.append([dest[0],dest[1],z])
+    if z!=dest[2]:
+      path.append(dest)
+    
+    # This is a valid path, check for best path
+
+
+  if n==0:
+    return best_path
+
+  if n==1:
+    if not noflyzones[0].doesIntersect([src[0],src[1],0],[dest[0],dest[1],0]):
+      return best_path
+    
+    coordinates=[[noflyzones[0].mn[0],noflyzones[0].mn[1]],[noflyzones[0].mn[0],noflyzones[0].mx[1]],[noflyzones[0].mx[0],noflyzones[0].mn[1]],[noflyzones[0].mx[0],noflyzones[0].mx[1]]]
+    
+    for c in coordinates:
+
+      if noflyzones[0].doesIntersect(src,[c[0],c[1],src[2]]) or noflyzones[0].doesIntersect([c[0],c[1],dest[2]],dest):
+        continue
+
+      path.append([c[0],c[1],src[2]])
+      path.append([dest[0],dest[1],src[2]])
+      
+      if src[2] != dest[2]:
+        path.append(dest)
+      
+      #Check for best path
+
+    
+    for c1 in coordinates:
+      for c2 in coordinates:
+        if c1 == c2:
+          continue
+        if c1[0] != c2[0] and c1[1] != c2[1]:
+          continue
+
+        if noflyzones[0].doesIntersect(src,[c1[0],c1[1],src[2]]) or noflyzones[0].doesIntersect([c2[0],c2[1],dest[2]],dest):
+          continue
+
+        path.append([c1[0],c1[1],src[2]])
+        path.append([c2[0],c2[1],src[2]])
+        path.append([dest[0],dest[1],src[2]])
+      
+        if src[2] != dest[2]:
+          path.append(dest)
+      
+        #Check for best path
+    
+    return best_path
+
+
+  # TO be complted
+  """
+  if n == 2:
+
+    coordinates1=[[noflyzones[0].mn[0],noflyzones[0].mn[1]],[noflyzones[0].mn[0],noflyzones[0].mx[1]],[noflyzones[0].mx[0],noflyzones[0].mn[1]],[noflyzones[0].mx[0],noflyzones[0].mx[1]]]
+    coordinates2=[[noflyzones[1].mn[0],noflyzones[1].mn[1]],[noflyzones[1].mn[0],noflyzones[1].mx[1]],[noflyzones[1].mx[0],noflyzones[1].mn[1]],[noflyzones[1].mx[0],noflyzones[1].mx[1]]]
+
+
+    for c in coordinates1:
+
+      if noflyzones[0].doesIntersect(src,[c[0],c[1],src[2]]) or noflyzones[0].doesIntersect([c[0],c[1],dest[2]],dest):
+        continue
+
+      path.append([c[0],c[1],src[2]])
+      path.append([dest[0],dest[1],src[2]])
+      
+      if src[2] != dest[2]:
+        path.append(dest)
+      
+      #Check for best path
+  """
+
+
+
+
 
 if __name__ == "__main__":
     process_params()
@@ -199,3 +307,7 @@ if __name__ == "__main__":
             )
             drones.append(drone_object)
     itemtype_objects = read_item_details()
+
+
+
+

@@ -69,9 +69,12 @@ class NoFlyZone:
         print(self.mn)
     
     def inRange(self,a,b,c):
-        return c>=a and c<=b
+        return c>a and c<b
 
     def doesIntersect(self,a,b):
+        """
+        Does not cover the case when a and b are diagonally opposite points of the rectangle
+        """
         if a[0]==b[0]:
             return inRange(self.mn[0],self.mx[0],a[0])
         if a[1]==b[1]:
@@ -96,7 +99,6 @@ class NoFlyZone:
             return True
 
         return False
-
 
 
 
