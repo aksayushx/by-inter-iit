@@ -73,7 +73,7 @@ def read_item_details(path="./data/items.xlsx"):
         itemtype_objects.append(item_object)
 
 
-def read_demands(demands_path="data/Scenario1/Demand.csv"):
+def read_demands(demands_path="data/Scenario3/Demand_Day1.csv"):
 
     global demands
     demand = pd.read_csv(demands_path)
@@ -173,7 +173,7 @@ def check_drone_availibility(drone, timestamp):
     return not drone.check_occupy(timestamp)
 
 
-def process_params(param_path="data/Scenario1/Parameters.csv"):
+def process_params(param_path="data/Scenario3/Parameters.csv"):
 
     global M 
     # Cost
@@ -281,7 +281,6 @@ def getPath(src, dest, drone, demand):
     best_path = []
     min_cost = 1e18
     for z in range(0, 201):
-        pres_cost = 0.0
         cor = src
         ok = True
         path = [src]
@@ -307,6 +306,7 @@ def getPath(src, dest, drone, demand):
         )
         if energy_cost < min_cost:
             best_path = path
+            min_cost=energy_cost
 
     if n == 0:
         return best_path
@@ -323,6 +323,8 @@ def getPath(src, dest, drone, demand):
         ]
 
         for c in coordinates:
+
+            path = [src]
 
             if noflyzones[0].doesIntersect(src, [c[0], c[1], src[2]]) or noflyzones[
                 0
@@ -341,6 +343,7 @@ def getPath(src, dest, drone, demand):
             )
             if energy_cost < min_cost:
                 best_path = path
+                min_cost=energy_cost
 
         for c1 in coordinates:
             for c2 in coordinates:
@@ -348,6 +351,7 @@ def getPath(src, dest, drone, demand):
                     continue
                 if c1[0] != c2[0] and c1[1] != c2[1]:
                     continue
+                path = [src]
 
                 if noflyzones[0].doesIntersect(
                     src, [c1[0], c1[1], src[2]]
@@ -367,8 +371,10 @@ def getPath(src, dest, drone, demand):
                 )
                 if energy_cost < min_cost:
                     best_path = path
+                    min_cost=energy_cost
 
         return best_path
+    return best_path
 
     # TO be complted
     """
@@ -393,63 +399,68 @@ def getPath(src, dest, drone, demand):
   """
 
 
-if __name__ == "__main__":
-    read_item_details()
-    process_params()
-    read_demands()
-    print(M)
-    exit()
-    dronetype_objects = read_drone_details(max_speed=M)
-    drones = []
-    for i in range(len(drone_count)):
-        for j in range(int(drone_count[i])):
-            drone_object = Drone(
-                dronetype_objects[i].type,
-                dronetype_objects[i].battery_capacity,
-                dronetype_objects[i].base_weight,
-                dronetype_objects[i].payload_weight,
-                dronetype_objects[i].payload_volume,
-                dronetype_objects[i].slots,
-                dronetype_objects[i].max_speed,
-                j,
-            )
-            drones.append(drone_object)
+read_item_details()
+process_params()
+read_demands()
+dronetype_objects = read_drone_details(max_speed=M)
+drones = []
+for i in range(len(drone_count)):
+    for j in range(int(drone_count[i])):
+        drone_object = Drone(
+            dronetype_objects[i].type,
+            dronetype_objects[i].battery_capacity,
+            dronetype_objects[i].base_weight,
+            dronetype_objects[i].payload_weight,
+            dronetype_objects[i].payload_volume,
+            dronetype_objects[i].slots,
+            dronetype_objects[i].max_speed,
+            j,
+        )
+        drones.append(drone_object)
 
-    demands.sort(key=lambda x: x.del_to)
-    for demand in demands:
-        # processing each demand
-        startpoint = wh[demand.wh - 1]
-        endpoint = [demand.x, demand.y, demand.z]
-        demand_item = demand.item
-        for drone in drones:
-            possible = check_weight_volume(drone, demand_item)
-            if not possible:
-                continue
-            # wrong
-            # drone.current_charge = drone.battery_capacity
-            path = getPath(startpoint, endpoint, drone, demand)
-            return_path = getPath(endpoint, startpoint, drone, demand)
-            timestamp, energy, time_taken = calculate_starting_time_energy(
-                drone, path, demand
-            )
-            (
-                timestamp_return,
-                return_energy,
-                return_time_taken,
-            ) = calculate_starting_time_energy(drone, return_path)
-            if energy + return_energy > drone.current_charge:
-                continue
-            possible = check_drone_availibility(drone, timestamp)
-            if not possible:
-                continue
-            drone.occupy_update(timestamp, demand.del_to + return_time_taken)
-            demand.is_completed = True
-            break
-
-        print(f"{demand.demand_id} and {demand.is_completed}")
-        """
-        if demand.is_completed:
-            print(f"Demand {demand.demand_id} Met")
-        else:
-            print(f"Demand {demand.demand_id} not met.")
-        """
+demands.sort(key=lambda x: x.del_to)
+ctr=0
+print(len(demands))
+for demand in demands:
+    # processing each demand
+    startpoint = wh[demand.wh - 1]
+    endpoint = [demand.x, demand.y, demand.z]
+    demand_item = demand.item
+    print(ctr)
+    ctr += 1
+    print(demand.demand_id)
+    
+    for drone in drones:
+        possible = check_weight_volume(drone, demand_item)
+        if not possible:
+            continue
+        # wrong
+        # drone.current_charge = drone.battery_capacity
+        path = getPath(startpoint, endpoint, drone, demand)
+        return_path = getPath(endpoint, startpoint, drone, dummy_demand)
+        timestamp, energy, time_taken = calculate_starting_time_energy(
+            drone, path, demand
+        )
+        (
+            timestamp_return,
+            return_energy,
+            return_time_taken,
+        ) = calculate_starting_time_energy(drone, return_path, dummy_demand)
+        if energy + return_energy > drone.current_charge:
+            continue
+        possible = check_drone_availibility(drone, timestamp)
+        if not possible:
+            continue
+        drone.occupy_update(timestamp, demand.del_to + return_time_taken)
+        demand.is_completed = True
+        print(path)
+        break
+    
+    
+    #print(f"{demand.demand_id} and {demand.is_completed}")
+    
+    if demand.is_completed:
+        print(f"Demand {demand.demand_id} Met")
+    else:
+        print(f"Demand {demand.demand_id} not met.")
+    

@@ -98,6 +98,9 @@ class NoFlyZone:
         """
         Does not cover the case when a and b are diagonally opposite points of the rectangle
         """
+        if a[2] == b[2]:
+            return a[2] >= self.mx[2] or a[2] <= self.mn[2]
+
         if a[0] == b[0]:
             return self.inRange(self.mn[0], self.mx[0], a[0])
         if a[1] == b[1]:
