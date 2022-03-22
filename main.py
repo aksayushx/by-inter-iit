@@ -30,6 +30,8 @@ noflyzones = []
 
 itemtype_objects = []
 
+dummy_demand = Demand(0, 0, Item(0, 0, 0, 0, 0), 0, 0, 0, 0, 0, 0, 0)
+
 
 def get_seconds(hhmmss):
     hh = int(hhmmss.split(":")[0])
@@ -167,7 +169,7 @@ def check_weight_volume(drone, item):
         return 0
 
 
-def calculate_starting_time_energy(drone, path, demand):
+def calculate_starting_time_energy(drone, path, demand=dummy_demand):
     fraction_payload = demand.item.weight / drone.payload_weight
     max_xy_speed = M - P[drone.type - 1] * fraction_payload
     max_upward_speed = M - Q[drone.type - 1] * fraction_payload
@@ -228,7 +230,7 @@ def calculate_starting_time_energy(drone, path, demand):
 
     reaching_time = demand.del_to - 180
     starting_time = reaching_time - total_time
-    return starting_time, energy_consumed
+    return starting_time, energy_consumed, total_time
 
 
 def check_drone_availibility(drone, timestamp):
@@ -262,13 +264,28 @@ if __name__ == "__main__":
         endpoint = [demand.x, demand.y, demand.z]
         demand_item = demand.item
         # find path
+        # find return_path
         for drone in drones:
             possible = check_weight_volume(demand_item, drone)
             if not possible:
                 continue
-            timestamp, energy = calculate_starting_time_and_energy(drone, path, demand)
-            if energy > drone.current_charge:
+            timestamp, energy, time_taken = calculate_starting_time_energy(
+                drone, path, demand
+            )
+            (
+                timestamp_return,
+                return_energy,
+                return_time_taken,
+            ) = calculate_starting_time_energy(drone, return_path)
+            if energy + return_energy > drone.current_charge:
                 continue
             possible = check_drone_availibility(drone, timestamp)
             if not possible:
                 continue
+            drone.occupy_update(timestamp, demand.del_to + return_time_taken)
+            demand.is_completed = True
+            break
+        if demand.is_completed:
+            print(f"Demand {demand.demand_id} Met")
+        else:
+            print(f"Demand {demand.demand_id} not met.")

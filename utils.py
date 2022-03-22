@@ -82,6 +82,7 @@ class Demand:
         self.del_from = del_from
         self.del_to = del_to
         self.failure = failure
+        self.is_completed = False
 
 
 class NoFlyZone:
