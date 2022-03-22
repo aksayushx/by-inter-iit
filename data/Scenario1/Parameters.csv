@@ -1,0 +1,42 @@
+Parameter_ID,Value,Unit,Type
+MaxSpeed (M),17,m/s,
+Cost(C),1.8,$/AH,
+WH1X,0,Meter,WH Location 1
+WH1Y,0,Meter,WH Location 2
+WH1Z,0,Meter,WH Location 3
+P1,1,,Drone1
+P2,2,,Drone2
+P3,2,,Drone3
+P4,3,,Drone4
+P5,5,,Drone5
+P6,4,,Drone6
+Q1,1,,Drone1
+Q2,1,,Drone2
+Q3,2,,Drone3
+Q4,2,,Drone4
+Q5,3,,Drone5
+Q6,4,,Drone6
+A1,0.01,,Drone1
+A2,0.02,,Drone2
+A3,0.08,,Drone3
+A4,0.05,,Drone4
+A5,0.06,,Drone5
+A6,0.04,,Drone6
+B1,0.02,,Drone1
+B2,0.03,,Drone2
+B3,0.03,,Drone3
+B4,0.05,,Drone4
+B5,0.04,,Drone5
+B6,0.03,,Drone6
+C1,0.01,,Drone1
+C2,0.01,,Drone2
+C3,0.01,,Drone3
+C4,0.02,,Drone4
+C5,0.03,,Drone5
+C6,0.03,,Drone6
+DT1Count,2,,Drone1
+DT2Count,5,,Drone2
+DT3Count,5,,Drone3
+DT4Count,5,,Drone4
+DT5Count,5,,Drone5
+DT6Count,2,,Drone6

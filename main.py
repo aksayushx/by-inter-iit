@@ -73,7 +73,7 @@ def read_item_details(path="./data/items.xlsx"):
         itemtype_objects.append(item_object)
 
 
-def read_demands(demands_path="data/Demand.csv"):
+def read_demands(demands_path="data/Scenario1/Demand.csv"):
     demand = pd.read_csv(demands_path)
     for index, row in demand.iterrows():
         warehouse = int(row["WH"][-1])
@@ -159,17 +159,16 @@ def calculate_starting_time_energy(drone, path, demand=dummy_demand):
 
     reaching_time = demand.del_to - 180
     starting_time = reaching_time - total_time
-    return starting_time, energy_consumed, total_time
+    return starting_time, total_energy, total_time
 
 
 def check_drone_availibility(drone, timestamp):
     return not drone.check_occupy(timestamp)
 
 
-def process_params(param_path="data/Parameters.csv"):
+def process_params(param_path="data/Scenario1/Parameters.csv"):
 
     parameters = pd.read_csv(param_path)
-    print(parameters.head())
 
     M = parameters.loc[parameters["Parameter_ID"] == "MaxSpeed (M)", "Value"].iloc[0]
     C = parameters.loc[parameters["Parameter_ID"] == "Cost(C)", "Value"].iloc[0]
@@ -371,12 +370,14 @@ if __name__ == "__main__":
         startpoint = wh[demand.wh - 1]
         endpoint = [demand.x, demand.y, demand.z]
         demand_item = demand.item
-        # find path
-        # find return_path
+        path = getPath(startpoint, endpoint)
+        return_path = getPath(endpoint, startpoint)
         for drone in drones:
-            possible = check_weight_volume(demand_item, drone)
+            possible = check_weight_volume(drone, demand_item)
             if not possible:
                 continue
+            # wrong
+            # drone.current_charge = drone.battery_capacity
             timestamp, energy, time_taken = calculate_starting_time_energy(
                 drone, path, demand
             )
@@ -393,6 +394,7 @@ if __name__ == "__main__":
             drone.occupy_update(timestamp, demand.del_to + return_time_taken)
             demand.is_completed = True
             break
+
         if demand.is_completed:
             print(f"Demand {demand.demand_id} Met")
         else:
