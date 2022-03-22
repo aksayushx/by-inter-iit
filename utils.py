@@ -1,4 +1,3 @@
-from cv2 import inRange
 import pandas as pd
 import numpy as np
 from string import ascii_uppercase
@@ -92,32 +91,35 @@ class NoFlyZone:
         self.mx = np.max(np.array(points), axis=0)
         print(self.mx)
         print(self.mn)
+    
+    def inRange(self,a,b,c):
+        return c>a and c<b
 
-    def inRange(self, a, b, c):
-        return c >= a and c <= b
-
-    def doesIntersect(self, a, b):
-        if a[0] == b[0]:
-            return inRange(self.mn[0], self.mx[0], a[0])
-        if a[1] == b[1]:
-            return inRange(self.mn[1], self.mn[1], a[1])
-
-        # Put x
-        y = a[1] + ((b[1] - a[1]) * (self.mn[0] - a[0])) / (b[0] - a[0])
-        if inRange(self.mn[1], self.mx[1], y):
+    def doesIntersect(self,a,b):
+        """
+        Does not cover the case when a and b are diagonally opposite points of the rectangle
+        """
+        if a[0]==b[0]:
+            return self.inRange(self.mn[0],self.mx[0],a[0])
+        if a[1]==b[1]:
+            return self.inRange(self.mn[1],self.mn[1],a[1])
+            
+        # Put x 
+        y=a[1]+((b[1]-a[1])*(self.mn[0]-a[0]))/(b[0]-a[0])
+        if self.inRange(self.mn[1],self.mx[1],y):
             return True
 
         y = a[1] + ((b[1] - a[1]) * (self.mx[0] - a[0])) / (b[0] - a[0])
-        if inRange(self.mn[1], self.mx[1], y):
+        if self.inRange(self.mn[1], self.mx[1], y):
             return True
 
         # Put y
         x = a[0] + ((b[0] - a[0]) * (self.mn[1] - a[1])) / (b[1] - a[1])
-        if inRange(self.mn[0], self.mx[0], x):
+        if self.inRange(self.mn[0], self.mx[0], x):
             return True
 
         x = a[0] + ((b[0] - a[0]) * (self.mx[1] - a[1])) / (b[1] - a[1])
-        if inRange(self.mn[0], self.mx[0], x):
+        if self.inRange(self.mn[0], self.mx[0], x):
             return True
 
         return False
