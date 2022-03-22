@@ -81,12 +81,16 @@ def get_next_point(drone, current_location, demand_points, warehouse_locations, 
 
 def get_next_drone(drone_available_time, drones):
   next_time = 10**9
+  cost = 10**9
   final_drone = None
   for drone in drones:
     if(next_time>drone_available_time[drone]):
       final_drone = drone
       next_time=drone_available_time[drone]
-  
+    elif(next_time==drone_available_time[drone] and cost>drone.base_weight):
+      final_drone = drone
+      cost=drone.base_weight
+
   return final_drone
 
 
