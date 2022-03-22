@@ -166,7 +166,73 @@ def check_weight_volume(drone, item):
     else:
         return 0
 
-def calculate_starting_time(drone)
+
+def calculate_starting_time_energy(drone, path, demand):
+    fraction_payload = demand.item.weight / drone.payload_weight
+    max_xy_speed = M - P[drone.type - 1] * fraction_payload
+    max_upward_speed = M - Q[drone.type - 1] * fraction_payload
+    max_downward_speed = M + Q[drone.type - 1] * fraction_payload
+    total_time = 0
+    total_energy = 0
+    for i in range(len(path) - 1):
+        initial_pos = path[i]
+        final_pos = path[i + 1]
+        if final_pos[2] != initial_pos[2]:
+            distance = final_pos[2] - initial_pos[2]
+            if distance < 0:
+                time_taken = np.ceil(abs(distance) / max_downward_speed)
+                energy_consumed = (
+                    drone.current_weight
+                    * (DA[drone.type - 1] + DB[drone.type - 1] * max_downward_speed)
+                    * (time_taken - 1)
+                )
+                distance_left = abs(distance) - (time_taken - 1) * max_downward_speed
+                energy_consumed += drone.current_weight * (
+                    DA[drone.type - 1] + DB[drone.type - 1] * distance_left
+                )
+            else:
+                time_taken = np.ceil(distance / max_upward_speed)
+                distance_left = abs(distance) - (time_taken - 1) * max_upward_speed
+                energy_consumed = (
+                    drone.current_weight
+                    * (
+                        DA[drone.type - 1]
+                        + DB[drone.type - 1] * max_upward_speed
+                        + DC[drone.type - 1] * max_upward_speed
+                    )
+                    * (time_taken - 1)
+                )
+                energy_consumed += drone.current_weight * (
+                    DA[drone.type - 1]
+                    + DB[drone.type - 1] * distance_left
+                    + DC[drone.type - 1] * distance_left
+                )
+        else:
+            distance = np.sqrt(
+                (final_pos[0] - initial_pos[0]) ** 2
+                + (final_pos[1] - initial_pos[1]) ** 2
+            )
+            time_taken = np.ceil(distance / max_xy_speed)
+            distance_left = abs(distance) - (time_taken - 1) * max_xy_speed
+            energy_consumed = (
+                drone.current_weight
+                * (DA[drone.type - 1] + DB[drone.type - 1] * max_xy_speed)
+                * (time_taken - 1)
+            )
+            energy_consumed += drone.current_weight * (
+                DA[drone.type - 1] + DB[drone.type - 1] * distance_left
+            )
+
+        total_time += time_taken
+        total_energy += energy_consumed
+
+    reaching_time = demand.del_to - 180
+    starting_time = reaching_time - total_time
+    return starting_time, energy_consumed
+
+
+def check_drone_availibility(drone, timestamp):
+    return not drone.check_occupy(timestamp)
 
 
 if __name__ == "__main__":
@@ -189,17 +255,20 @@ if __name__ == "__main__":
             )
             drones.append(drone_object)
 
-    demands.sort(key=lambda x: x.del_to, reverse=True)
+    demands.sort(key=lambda x: x.del_to)
     for demand in demands:
         # processing each demand
+        startpoint = wh[demand.wh - 1]
+        endpoint = [demand.x, demand.y, demand.z]
         demand_item = demand.item
+        # find path
         for drone in drones:
             possible = check_weight_volume(demand_item, drone)
             if not possible:
                 continue
-            startpoint = wh[demand.wh - 1]
-            endpoint = [demand.x, demand.y, demand.z]
-            # if both satisfied, then assign drone to demand, and then generate path
-            timestamp = calculate_starting_time(drone, path)
-
-            check_battery_feasibility(drone, path)
+            timestamp, energy = calculate_starting_time_and_energy(drone, path, demand)
+            if energy > drone.current_charge:
+                continue
+            possible = check_drone_availibility(drone, timestamp)
+            if not possible:
+                continue
