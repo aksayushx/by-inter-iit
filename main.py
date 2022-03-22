@@ -74,6 +74,8 @@ def read_item_details(path="./data/items.xlsx"):
 
 
 def read_demands(demands_path="data/Scenario1/Demand.csv"):
+
+    global demands
     demand = pd.read_csv(demands_path)
     for index, row in demand.iterrows():
         warehouse = int(row["WH"][-1])
@@ -100,9 +102,14 @@ def check_weight_volume(drone, item):
 
 def calculate_starting_time_energy(drone, path, demand=dummy_demand):
     fraction_payload = demand.item.weight / drone.payload_weight
-    max_xy_speed = M - P[drone.type - 1] * fraction_payload
-    max_upward_speed = M - Q[drone.type - 1] * fraction_payload
-    max_downward_speed = M + Q[drone.type - 1] * fraction_payload
+    max_xy_speed = drone.max_speed - P[drone.type - 1] * fraction_payload
+    max_upward_speed = drone.max_speed - Q[drone.type - 1] * fraction_payload
+    max_downward_speed = drone.max_speed + Q[drone.type - 1] * fraction_payload
+    if max_xy_speed == 0:
+        print(drone.max_speed)
+        print(P[drone.type - 1])
+        print(fraction_payload)
+        print("yay")
     total_time = 0
     total_energy = 0
     for i in range(len(path) - 1):
@@ -167,6 +174,32 @@ def check_drone_availibility(drone, timestamp):
 
 
 def process_params(param_path="data/Scenario1/Parameters.csv"):
+
+    global M 
+    # Cost
+    global C 
+    # drone count
+    global drone_count 
+    # Warehouse Coordinates(x,y,z)
+    global wh 
+    # Recharge Stations(x,y,z)
+    global rhg 
+    # Drone params P
+    global P
+    # Drone Params Q
+    global Q
+    # Energy params A
+    global DA
+    # Energy parmas B
+    global DB
+    # Energy params C
+    global DC
+    # Demands
+    global demands
+    # No fly zones
+    global noflyzones
+
+    global n
 
     parameters = pd.read_csv(param_path)
 
@@ -243,7 +276,7 @@ def pathCoordinates(src, dest):
     pass
 
 
-def getPath(src, dest):
+def getPath(src, dest, drone, demand):
 
     best_path = []
     min_cost = 1e18
@@ -268,6 +301,12 @@ def getPath(src, dest):
             path.append(dest)
 
         # This is a valid path, check for best path
+
+        starting_time, energy_cost, time_taken = calculate_starting_time_energy(
+            drone, path, demand
+        )
+        if energy_cost < min_cost:
+            best_path = path
 
     if n == 0:
         return best_path
@@ -297,6 +336,11 @@ def getPath(src, dest):
                 path.append(dest)
 
             # Check for best path
+            starting_time, energy_cost, time_taken = calculate_starting_time_energy(
+                drone, path, demand
+            )
+            if energy_cost < min_cost:
+                best_path = path
 
         for c1 in coordinates:
             for c2 in coordinates:
@@ -318,6 +362,11 @@ def getPath(src, dest):
                     path.append(dest)
 
                 # Check for best path
+                starting_time, energy_cost, time_taken = calculate_starting_time_energy(
+                    drone, path, demand
+                )
+                if energy_cost < min_cost:
+                    best_path = path
 
         return best_path
 
@@ -348,6 +397,8 @@ if __name__ == "__main__":
     read_item_details()
     process_params()
     read_demands()
+    print(M)
+    exit()
     dronetype_objects = read_drone_details(max_speed=M)
     drones = []
     for i in range(len(drone_count)):
@@ -370,14 +421,14 @@ if __name__ == "__main__":
         startpoint = wh[demand.wh - 1]
         endpoint = [demand.x, demand.y, demand.z]
         demand_item = demand.item
-        path = getPath(startpoint, endpoint)
-        return_path = getPath(endpoint, startpoint)
         for drone in drones:
             possible = check_weight_volume(drone, demand_item)
             if not possible:
                 continue
             # wrong
             # drone.current_charge = drone.battery_capacity
+            path = getPath(startpoint, endpoint, drone, demand)
+            return_path = getPath(endpoint, startpoint, drone, demand)
             timestamp, energy, time_taken = calculate_starting_time_energy(
                 drone, path, demand
             )
@@ -395,7 +446,10 @@ if __name__ == "__main__":
             demand.is_completed = True
             break
 
+        print(f"{demand.demand_id} and {demand.is_completed}")
+        """
         if demand.is_completed:
             print(f"Demand {demand.demand_id} Met")
         else:
             print(f"Demand {demand.demand_id} not met.")
+        """
