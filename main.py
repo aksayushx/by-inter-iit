@@ -642,6 +642,18 @@ for index,demand in enumerate(demands):
             drone.flight_time = drone.flight_time + time_taken + sec_time_taken + last_time_taken
             drone.charge_time = drone.charge_time + time_for_full_recharge
             drone.current_charge = drone.battery_capacity
+
+            charge_start_time = int(demands[i].del_to+last_time_taken)
+            time_for_full_recharge = int(time_for_full_recharge)
+            for index in range(time_for_full_recharge):
+                drone.x_s[charge_start_time+index] = wh[demand.wh-1][0]
+                drone.y_s[charge_start_time+index] = wh[demand.wh-1][1]
+                drone.z_s[charge_start_time+index] = wh[demand.wh-1][2]
+                drone.speed_s[charge_start_time+index] = 0
+                drone.energy_mah[charge_start_time+index] = 0
+                drone.weights[charge_start_time+index] = drone.base_weight
+                drone.activity[charge_start_time+index] = 'C-WH' + str(demand.wh)
+
             prev_weight = demand.item.weight
             demand.item.weight += demands[i].item.weight
             (starting_time, energy, time_taken, timewise_path, timewise_energy, timewise_speed) = output_path(path, drone, demand)
@@ -656,6 +668,19 @@ for index,demand in enumerate(demands):
             sec_time_taken = int(sec_time_taken)
             last_time_taken = int(last_time_taken)
             time_counter = starting_time
+
+            for index in range(180):
+                if time_counter - index < 0:
+                    break
+                drone.x_s[time_counter-index] = wh[demand.wh-1][0]
+                drone.y_s[time_counter-index] = wh[demand.wh-1][1]
+                drone.z_s[time_counter-index] = wh[demand.wh-1][2]
+                drone.speed_s[time_counter-index] = 0
+                drone.energy_mah[time_counter-index] = 0
+                drone.weights[time_counter-index] = drone.base_weight
+                drone.activity[time_counter-index] = "PU-WH"+str(demand.wh)
+
+
             for index in range(len(timewise_path)):
                 drone.x_s[time_counter] = timewise_path[index][0]
                 drone.y_s[time_counter] = timewise_path[index][1]
@@ -751,6 +776,20 @@ for index,demand in enumerate(demands):
         drone.flight_time = drone.flight_time + time_taken + return_time_taken
         drone.charge_time = drone.charge_time + time_for_full_recharge
         drone.current_charge = drone.battery_capacity
+
+        charge_start_time = int(demand.del_to+return_time_taken)
+        time_for_full_recharge = int(time_for_full_recharge)
+
+        for index in range(time_for_full_recharge):
+            drone.x_s[charge_start_time+index] = wh[demand.wh-1][0]
+            drone.y_s[charge_start_time+index] = wh[demand.wh-1][1]
+            drone.z_s[charge_start_time+index] = wh[demand.wh-1][2]
+            drone.speed_s[charge_start_time+index] = 0
+            drone.energy_mah[charge_start_time+index] = 0
+            drone.weights[charge_start_time+index] = drone.base_weight
+            drone.activity[charge_start_time+index] = 'C-WH' + str(demand.wh)
+
+
         print(path)
         (starting_time, energy, time_taken, timewise_path, timewise_energy, timewise_speed) = output_path(path, drone, demand)
         (starting_return_time, return_energy, return_time_taken, return_timewise_path, return_timewise_energy, return_timewise_speed) = output_path(path, drone, demand)
@@ -760,15 +799,27 @@ for index,demand in enumerate(demands):
         time_taken = int(time_taken)
         return_time_taken = int(return_time_taken)
         time_counter = starting_time
+
+        for index in range(180):
+            if time_counter - index < 0:
+                break
+            drone.x_s[time_counter-index] = wh[demand.wh-1][0]
+            drone.y_s[time_counter-index] = wh[demand.wh-1][1]
+            drone.z_s[time_counter-index] = wh[demand.wh-1][2]
+            drone.speed_s[time_counter-index] = 0
+            drone.energy_mah[time_counter-index] = 0
+            drone.weights[time_counter-index] = drone.base_weight
+            drone.activity[time_counter-index] = "PU-WH"+str(demand.wh)
+
         for index in range(len(timewise_path)):
-                drone.x_s[time_counter] = timewise_path[index][0]
-                drone.y_s[time_counter] = timewise_path[index][1]
-                drone.z_s[time_counter] = timewise_path[index][2]
-                drone.speed_s[time_counter] = timewise_speed[index]
-                drone.energy_mah[time_counter] = timewise_energy[index]
-                drone.weights[time_counter] = drone.base_weight + demand.item.weight
-                drone.activity[time_counter] = "T-L"
-                time_counter += 1
+            drone.x_s[time_counter] = timewise_path[index][0]
+            drone.y_s[time_counter] = timewise_path[index][1]
+            drone.z_s[time_counter] = timewise_path[index][2]
+            drone.speed_s[time_counter] = timewise_speed[index]
+            drone.energy_mah[time_counter] = timewise_energy[index]
+            drone.weights[time_counter] = drone.base_weight + demand.item.weight
+            drone.activity[time_counter] = "T-L"
+            time_counter += 1
 
         for index in range(180):
             drone.x_s[time_counter] = timewise_path[-1][0]
@@ -818,14 +869,74 @@ def output_costs(day):
     df = pd.DataFrame({'DroneID':Drone_Id,'Day':Day,'Resting Time (s)':Resting_Time,'Charging time (s)':Charging_Time,'Maintenance Cost ($)':Maintenance_Cost,'Energy Cost ($)':Energy_Cost})
     return df
 
-def create_path_df():
+def create_path_df(day):
+    
+    drone_ids = []
+    days = []
+    timestamps = []
+    x_coord = []
+    y_coord = []
+    z_coord = []
+    speed_vals = []
+    energy_vals = []
+    activities = []
+    weights = []
     for drone in drones:
-        print(drone.x_s)
+        last_activity_index = 17999
+        while drone.activity[last_activity_index]=="":
+            last_activity_index -= 1                
+            if last_activity_index == -1:
+                drone_ids.append(drone.id)
+                days.append(day)
+                timestamps.append(j)
+                x_coord.append(drone.x_s[j])
+                y_coord.append(drone.y_s[j])
+                z_coord.append(drone.z_s[j])
+                speed_vals.append(drone.speed_s[j])
+                energy_vals.append(drone.energy_mah[j])
+                activities.append("END")
+                weights.append(drone.weights[i])
+                break
+    
+        if last_activity_index != -1:
+            for j in range(0, last_activity_index+1):
+                drone_ids.append(drone.id)
+                days.append(day)
+                timestamps.append(j)
+                x_coord.append(drone.x_s[j])
+                y_coord.append(drone.y_s[j])
+                z_coord.append(drone.z_s[j])
+                speed_vals.append(drone.speed_s[j])
+                energy_vals.append(drone.energy_mah[j])
+                if drone.activity[i] == "":
+                    drone.activity[i] = "R-WH1"
+                activities.append(drone.activity[i])
+                weights.append(drone.weights[i])
+
+            drone_ids.append(drone.id)
+            days.append(day)
+            timestamps.append(j)
+            x_coord.append(drone.x_s[j])
+            y_coord.append(drone.y_s[j])
+            z_coord.append(drone.z_s[j])
+            speed_vals.append(drone.speed_s[j])
+            energy_vals.append(drone.energy_mah[j])
+            activities.append("END")
+            weights.append(drone.weights[i])
+
+    cost_energy = [C*energy for energy in energy_vals]
+    df = pd.DataFrame({"DroneID":drone_ids, "Day":days, "Time (In Seconds)":timestamps, "X":x_coord, "Y":y_coord, "Z":z_coord, "Activity":activities, "Speed (m/s)":speed_vals, "mAh Consumed":energy_vals, "Energy Cost (c x mAh)":cost_energy, "Total Weight (kgs)":weights})
+    df.to_csv("./DronePath_Output.csv", index=False)
+
+
 
 
 day1_costs = output_costs(1)
+
+
 day1_costs.to_csv(f"data/Scenario{sys.argv[1]}/DroneCost_Output.csv",index=False)
-create_path_df()
+create_path_df(1)
+
 
 
 
