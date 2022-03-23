@@ -45,6 +45,15 @@ class Drone:
         self.battery_charged = battery_capacity
         self.last_path=[]
 
+        self.timestamps = [j for j in range(0, 18000)]
+        self.x_s = [0]*18000
+        self.y_s = [0]*18000
+        self.z_s = [0]*18000
+        self.speed_s = [0]*18000
+        self.energy_mah = [0]*18000
+        self.weights = [0]*18000
+        self.activity = [""]*18000
+
     def occupy_update(self, starting_time, ending_time):
 
         self.occupied_slots.append([starting_time, ending_time])
