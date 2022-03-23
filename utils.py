@@ -43,6 +43,7 @@ class Drone:
         self.maintenance_variable_cost = maintenance_variable_cost
         self.occupied_slots = []
         self.battery_charged = battery_capacity
+        self.last_path=[]
 
     def occupy_update(self, starting_time, ending_time):
 
@@ -76,7 +77,7 @@ class Item:
 
 
 class Demand:
-    def __init__(self, wh, demand_id, item, day, x, y, z, del_from, del_to, failure):
+    def __init__(self, wh, demand_id, item, day, x, y, z, del_from, del_to, failure, extra_weight=0.0):
 
         self.wh = wh
         self.demand_id = demand_id
@@ -89,6 +90,7 @@ class Demand:
         self.del_to = del_to
         self.failure = failure
         self.is_completed = False
+        self.extra_weight=extra_weight
 
 
 class NoFlyZone:

@@ -1,3 +1,5 @@
+from tracemalloc import start
+from turtle import pos
 from utils import Drone, Item, Demand, NoFlyZone
 import pandas as pd
 import numpy as np
@@ -106,7 +108,7 @@ def check_weight_volume(drone, item):
 
 
 def calculate_starting_time_energy(drone, path, demand=dummy_demand):
-    fraction_payload = demand.item.weight / drone.payload_weight
+    fraction_payload = (demand.item.weight + demand.extra_weight) / drone.payload_weight
     max_xy_speed = drone.max_speed - P[drone.type - 1] * fraction_payload
     max_upward_speed = drone.max_speed - Q[drone.type - 1] * fraction_payload
     max_downward_speed = drone.max_speed + Q[drone.type - 1] * fraction_payload
@@ -404,6 +406,26 @@ def getPath(src, dest, drone, demand):
   """
 
 
+def simulate_travel(start,end,drone,demand,extra_demand=dummy_demand):
+    demand.item.weight += extra_demand.item.weight
+    demand.item.volume += extra_demand.item.volume
+    possible = check_weight_volume(drone, demand.item)
+    
+    if not possible:
+        demand.item.weight -= extra_demand.item.weight
+        demand.item.volume -= extra_demand.item.volume
+        return False, 0, 0, 0, []
+    drone.current_weight += demand.item.weight 
+    path = getPath(start, end, drone, demand)
+    timestamp, energy, time_taken = calculate_starting_time_energy(
+        drone, path, demand
+    )
+    drone.current_weight -= demand_item.weight 
+    demand.item.weight -= extra_demand.item.weight
+    demand.item.volume -= extra_demand.item.volume
+    return drone.current_charge >= energy, energy, timestamp, time_taken, path
+
+
 read_item_details()
 process_params()
 read_demands()
@@ -426,42 +448,102 @@ for i in range(len(drone_count)):
         drones.append(drone_object)
 
 demands.sort(key=lambda x: x.del_to)
-ctr=0
 print(len(demands))
-for demand in demands:
+for index,demand in enumerate(demands):
     # processing each demand
     startpoint = wh[demand.wh - 1]
     endpoint = [demand.x, demand.y, demand.z]
-    demand_item = demand.item
-    print(ctr)
-    ctr += 1
+    demand_item= demand.item
+    if demand.is_completed:
+        continue
+
     print(demand.demand_id)
+    print(index)
+
+    found=False
+
+    for i in range(index+1,len(demands)):
+        if demands[i].is_completed:
+            continue
+        for drone in drones:
+            if drone.slots == 1:
+                continue
+            battery_used = 0.0
+            done, energy, timestamp, time_taken, path = simulate_travel(startpoint, endpoint, drone, demand, demands[i])
+            
+            battery_used += energy
+            if not done:
+                continue
+            sec_dest=[demands[i].x,demands[i].y,demands[i].z]
+            sec_done, sec_energy, sec_timestamp, sec_time_taken, sec_path = simulate_travel(endpoint, sec_dest, drone, demands[i])
+
+            if not sec_done or sec_timestamp < demand.del_to:
+                continue
+
+            battery_used += sec_energy
+
+            last_done, last_energy, last_timestamp, last_time_taken, last_path = simulate_travel(sec_dest, startpoint, drone, dummy_demand)
+
+            if not last_done:
+                continue
+
+            battery_used += last_energy
+
+            if battery_used > drone.current_charge:
+                continue
+
+            possible = check_drone_availibility(drone, timestamp)
+            if not possible:
+                continue
+            
+            demand.is_completed = True
+            demands[i].is_completed = True
+            found=True
+            
+            drone.current_charge = drone.current_charge-battery_used
+            time_for_full_recharge = np.ceil( ((drone.battery_capacity-drone.current_charge)/5000)*3600)
+            drone.battery_charged = drone.battery_capacity-drone.current_charge
+            drone.occupy_update(timestamp, demands[i].del_to + last_time_taken + time_for_full_recharge)
+            drone.flight_time = drone.flight_time + time_taken + sec_time_taken + last_time_taken
+            drone.charge_time = drone.charge_time + time_for_full_recharge
+            drone.current_charge = drone.battery_capacity
+            print(path)
+            print(sec_path)
+            print(last_path)
+            print(f"Demand {demand.demand_id} Met")
+            print(f"Demand {demands[i].demand_id} Met")
+            break
+        if found: 
+            break
+
+
+
+
+
+    if found:
+        continue
     
     for drone in drones:
-        possible = check_weight_volume(drone, demand_item)
-        drone.current_weight += demand_item.weight
-        if not possible:
+        battery_used=0.0
+        done, energy, timestamp, time_taken, path=simulate_travel(startpoint,endpoint,drone,demand)
+        battery_used += energy
+        
+        if not done:
             continue
-        # wrong
-        # drone.current_charge = drone.battery_capacity
-        path = getPath(startpoint, endpoint, drone, demand)
-        timestamp, energy, time_taken = calculate_starting_time_energy(
-            drone, path, demand
-        )
-        drone.current_weight-=demand_item.weight
-        return_path = getPath(endpoint, startpoint, drone, dummy_demand)
-        (
-            timestamp_return,
-            return_energy,
-            return_time_taken,
-        ) = calculate_starting_time_energy(drone, return_path, dummy_demand)
-        if energy + return_energy > drone.current_charge:
-            continue
+
+        return_done, return_energy, return_timestamp, return_time_taken, return_path = simulate_travel(endpoint,startpoint,drone,dummy_demand)
+
+        battery_used += return_energy
+        
+        if not return_done or battery_used > drone.current_charge:
+            continue  
+
         possible = check_drone_availibility(drone, timestamp)
         if not possible:
             continue
         drone.occupy_update(timestamp, demand.del_to + return_time_taken)
         demand.is_completed = True
+
         
         drone.current_charge = drone.current_charge-energy-return_energy
         time_for_full_recharge = np.ceil( ((drone.battery_capacity-drone.current_charge)/5000)*3600)
