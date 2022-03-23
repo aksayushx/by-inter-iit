@@ -177,6 +177,138 @@ def calculate_starting_time_energy(drone, path, demand=dummy_demand):
 def check_drone_availibility(drone, timestamp):
     return not drone.check_occupy(timestamp)
 
+def output_path(path,drone,demand):
+    fraction_payload = demand.item.weight / drone.payload_weight
+    max_xy_speed = drone.max_speed - P[drone.type - 1] * fraction_payload
+    max_upward_speed = drone.max_speed - Q[drone.type - 1] * fraction_payload
+    max_downward_speed = drone.max_speed + Q[drone.type - 1] * fraction_payload
+    total_time = 0
+    total_energy = 0
+    timewise_path = [path[0]]
+    timewise_energy = []
+    timewise_speed = []
+    for i in range(len(path) - 1):
+        initial_pos = path[i]
+        final_pos = path[i + 1]
+        if final_pos[2] != initial_pos[2]:
+            distance = final_pos[2] - initial_pos[2]
+            if distance < 0:
+                time_taken = np.ceil(abs(distance) / max_downward_speed)
+                energy_consumed = (
+                    drone.current_weight
+                    * (DA[drone.type - 1] + DB[drone.type - 1] * max_downward_speed)
+                    * (time_taken - 1)
+                )
+                distance_left = abs(distance) - (time_taken - 1) * max_downward_speed
+                energy_consumed += drone.current_weight * (
+                    DA[drone.type - 1] + DB[drone.type - 1] * distance_left
+                )
+                curr_position = initial_pos
+                for j in range(int(time_taken) - 1):
+                    curr_position[2] -= max_downward_speed
+                    timewise_path.append(curr_position)
+                    timewise_energy.append(
+                        drone.current_weight
+                        * (DA[drone.type - 1] + DB[drone.type - 1] * max_downward_speed)
+                    )
+                    timewise_speed.append(max_downward_speed)
+                timewise_path.append(final_pos)
+                timewise_energy.append(
+                    drone.current_weight
+                    * (DA[drone.type - 1] + DB[drone.type - 1] * distance_left)
+                )
+                timewise_speed.append(distance_left)
+            else:
+                time_taken = np.ceil(distance / max_upward_speed)
+                distance_left = abs(distance) - (time_taken - 1) * max_upward_speed
+                energy_consumed = (
+                    drone.current_weight
+                    * (
+                        DA[drone.type - 1]
+                        + DB[drone.type - 1] * max_upward_speed
+                        + DC[drone.type - 1] * max_upward_speed
+                    )
+                    * (time_taken - 1)
+                )
+                energy_consumed += drone.current_weight * (
+                    DA[drone.type - 1]
+                    + DB[drone.type - 1] * distance_left
+                    + DC[drone.type - 1] * distance_left
+                )
+                curr_position = initial_pos
+                for j in range(int(time_taken) - 1):
+                    curr_position[2] += max_upward_speed
+                    timewise_path.append(curr_position)
+                    timewise_energy.append(
+                        drone.current_weight
+                        * (
+                            DA[drone.type - 1]
+                            + DB[drone.type - 1] * max_upward_speed
+                            + DC[drone.type - 1] * max_upward_speed
+                        )
+                    )
+                    timewise_speed.append(max_upward_speed)
+                timewise_path.append(final_pos)
+                timewise_energy.append(
+                    drone.current_weight
+                    * (
+                        DA[drone.type - 1]
+                        + DB[drone.type - 1] * distance_left
+                        + DC[drone.type - 1] * distance_left
+                    )
+                )
+                timewise_speed.append(distance_left)
+        else:
+            distance = np.sqrt(
+                (final_pos[0] - initial_pos[0]) ** 2
+                + (final_pos[1] - initial_pos[1]) ** 2
+            )
+            time_taken = np.ceil(distance / max_xy_speed)
+            distance_left = abs(distance) - (time_taken - 1) * max_xy_speed
+            energy_consumed = (
+                drone.current_weight
+                * (DA[drone.type - 1] + DB[drone.type - 1] * max_xy_speed)
+                * (time_taken - 1)
+            )
+            energy_consumed += drone.current_weight * (
+                DA[drone.type - 1] + DB[drone.type - 1] * distance_left
+            )
+            curr_position = initial_pos
+            y_dist = final_pos[1] - initial_pos[1]
+            x_dist = final_pos[0] - initial_pos[0]
+            hyp = np.sqrt((x_dist) ** 2 + y_dist ** 2)
+            cos_theta = x_dist / hyp
+            sin_theta = y_dist / hyp
+            for j in range(int(time_taken) - 1):
+                curr_position[0] += max_xy_speed * cos_theta
+                curr_position[1] += max_xy_speed * sin_theta
+                timewise_path.append(curr_position)
+                timewise_energy.append(
+                    drone.current_weight
+                    * (DA[drone.type - 1] + DB[drone.type - 1] * max_xy_speed)
+                )
+                timewise_speed.append(max_xy_speed)
+            timewise_path.append(final_pos)
+            timewise_energy.append(
+                drone.current_weight
+                * (DA[drone.type - 1] + DB[drone.type - 1] * distance_left)
+            )
+            timewise_speed.append(distance_left)
+
+        total_time += time_taken
+        total_energy += energy_consumed
+
+    reaching_time = demand.del_to - 180
+    starting_time = reaching_time - total_time
+    return (
+        starting_time,
+        total_energy,
+        total_time,
+        timewise_path,
+        timewise_energy,
+        timewise_speed,
+    )
+
 
 def process_params(param_path="data/Scenario2/Parameters.csv"):
 
@@ -505,9 +637,11 @@ for index,demand in enumerate(demands):
             drone.flight_time = drone.flight_time + time_taken + sec_time_taken + last_time_taken
             drone.charge_time = drone.charge_time + time_for_full_recharge
             drone.current_charge = drone.battery_capacity
+            demand.item.weight += demands[i].item.weight
+            #(starting_time, total_energy, total_time, timewise_path, timewise_energy, timewise_speed) = output_path(path, drone, demand)
             print(path)
-            print(sec_path)
-            print(last_path)
+            #print(timewise_path)
+            exit()
             print(f"Demand {demand.demand_id} Met")
             print(f"Demand {demands[i].demand_id} Met")
             break
@@ -585,135 +719,5 @@ def output_costs(day):
 day1_costs = output_costs(1)
 day1_costs.to_csv("DroneCost_Output.csv",index=False)
 
-def output_path(path,drone,demand):
-    fraction_payload = demand.item.weight / drone.payload_weight
-    max_xy_speed = drone.max_speed - P[drone.type - 1] * fraction_payload
-    max_upward_speed = drone.max_speed - Q[drone.type - 1] * fraction_payload
-    max_downward_speed = drone.max_speed + Q[drone.type - 1] * fraction_payload
-    total_time = 0
-    total_energy = 0
-    timewise_path = [path[0]]
-    timewise_energy = []
-    timewise_speed = []
-    for i in range(len(path) - 1):
-        initial_pos = path[i]
-        final_pos = path[i + 1]
-        if final_pos[2] != initial_pos[2]:
-            distance = final_pos[2] - initial_pos[2]
-            if distance < 0:
-                time_taken = np.ceil(abs(distance) / max_downward_speed)
-                energy_consumed = (
-                    drone.current_weight
-                    * (DA[drone.type - 1] + DB[drone.type - 1] * max_downward_speed)
-                    * (time_taken - 1)
-                )
-                distance_left = abs(distance) - (time_taken - 1) * max_downward_speed
-                energy_consumed += drone.current_weight * (
-                    DA[drone.type - 1] + DB[drone.type - 1] * distance_left
-                )
-                curr_position = initial_pos
-                for j in range(int(time_taken) - 1):
-                    curr_position[2] -= max_downward_speed
-                    timewise_path.append(curr_position)
-                    timewise_energy.append(
-                        drone.current_weight
-                        * (DA[drone.type - 1] + DB[drone.type - 1] * max_downward_speed)
-                    )
-                    timewise_speed.append(max_downward_speed)
-                timewise_path.append(final_pos)
-                timewise_energy.append(
-                    drone.current_weight
-                    * (DA[drone.type - 1] + DB[drone.type - 1] * distance_left)
-                )
-                timewise_speed.append(distance_left)
-            else:
-                time_taken = np.ceil(distance / max_upward_speed)
-                distance_left = abs(distance) - (time_taken - 1) * max_upward_speed
-                energy_consumed = (
-                    drone.current_weight
-                    * (
-                        DA[drone.type - 1]
-                        + DB[drone.type - 1] * max_upward_speed
-                        + DC[drone.type - 1] * max_upward_speed
-                    )
-                    * (time_taken - 1)
-                )
-                energy_consumed += drone.current_weight * (
-                    DA[drone.type - 1]
-                    + DB[drone.type - 1] * distance_left
-                    + DC[drone.type - 1] * distance_left
-                )
-                curr_position = initial_pos
-                for j in range(int(time_taken) - 1):
-                    curr_position[2] += max_upward_speed
-                    timewise_path.append(curr_position)
-                    timewise_energy.append(
-                        drone.current_weight
-                        * (
-                            DA[drone.type - 1]
-                            + DB[drone.type - 1] * max_upward_speed
-                            + DC[drone.type - 1] * max_upward_speed
-                        )
-                    )
-                    timewise_speed.append(max_upward_speed)
-                timewise_path.append(final_pos)
-                timewise_energy.append(
-                    drone.current_weight
-                    * (
-                        DA[drone.type - 1]
-                        + DB[drone.type - 1] * distance_left
-                        + DC[drone.type - 1] * distance_left
-                    )
-                )
-                timewise_speed.append(distance_left)
-        else:
-            distance = np.sqrt(
-                (final_pos[0] - initial_pos[0]) ** 2
-                + (final_pos[1] - initial_pos[1]) ** 2
-            )
-            time_taken = np.ceil(distance / max_xy_speed)
-            distance_left = abs(distance) - (time_taken - 1) * max_xy_speed
-            energy_consumed = (
-                drone.current_weight
-                * (DA[drone.type - 1] + DB[drone.type - 1] * max_xy_speed)
-                * (time_taken - 1)
-            )
-            energy_consumed += drone.current_weight * (
-                DA[drone.type - 1] + DB[drone.type - 1] * distance_left
-            )
-            curr_position = initial_pos
-            y_dist = final_pos[1] - initial_pos[1]
-            x_dist = final_pos[0] - initial_pos[0]
-            hyp = np.sqrt((x_dist) ** 2 + y_dist ** 2)
-            cos_theta = x_dist / hyp
-            sin_theta = y_dist / hyp
-            for j in range(int(time_taken) - 1):
-                curr_position[0] += max_xy_speed * cos_theta
-                curr_position[1] += max_xy_speed * sin_theta
-                timewise_path.append(curr_position)
-                timewise_energy.append(
-                    drone.current_weight
-                    * (DA[drone.type - 1] + DB[drone.type - 1] * max_xy_speed)
-                )
-                timewise_speed.append(max_xy_speed)
-            timewise_path.append(final_pos)
-            timewise_energy.append(
-                drone.current_weight
-                * (DA[drone.type - 1] + DB[drone.type - 1] * distance_left)
-            )
-            timewise_speed.append(distance_left)
 
-        total_time += time_taken
-        total_energy += energy_consumed
-
-    reaching_time = demand.del_to - 180
-    starting_time = reaching_time - total_time
-    return (
-        starting_time,
-        total_energy,
-        total_time,
-        timewise_path,
-        timewise_energy,
-        timewise_speed,
-    )
 
