@@ -481,6 +481,7 @@ for demand in demands:
     else:
         print(f"Demand {demand.demand_id} not met.")
 
+
 def output_costs(day):
     
     Drone_Id=[]
@@ -495,12 +496,15 @@ def output_costs(day):
         Day.append(day)
         Charging_Time.append(drone.charge_time)
         Resting_Time.append(14400-drone.flight_time)
-        Maintenance_Cost.append(drone.maintenance_fixed_cost+(drone.maintenance_variable_cost*drone.flight_time)/3600)
-        Energy_Cost.append((C*drone.battery_charged*drone.charge_time)/1000)
+        Maintenance_Cost.append(round(drone.maintenance_fixed_cost+(drone.maintenance_variable_cost*drone.flight_time)/3600,2))
+        Energy_Cost.append(round( (C*drone.battery_charged*drone.charge_time)/1000,2 ))
     
     df = pd.DataFrame({'DroneID':Drone_Id,'Day':Day,'Resting Time (s)':Resting_Time,'Charging time (s)':Charging_Time,'Maintenance Cost ($)':Maintenance_Cost,'Energy Cost ($)':Energy_Cost})
     return df
 
+
 day1_costs = output_costs(1)
-day1_costs.to_csv("DroneCost_Output.csv",index=False)
+day2_costs = output_costs(2)
+final_costs_df = pd.concat([day1_costs,day2_costs],axis=0)
+final_costs_df.to_csv("DroneCost_Output.csv",index=False)
 
