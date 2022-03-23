@@ -1,3 +1,4 @@
+from turtle import pos
 from utils import Drone, Item, Demand, NoFlyZone
 import pandas as pd
 import numpy as np
@@ -437,7 +438,11 @@ for demand in demands:
     ctr += 1
     print(demand.demand_id)
     
+    total_energy = 10**9
+    i_pos, drone_pos = -1, 0
+
     for drone in drones:
+        i_pos += 1
         possible = check_weight_volume(drone, demand_item)
         drone.current_weight += demand_item.weight
         if not possible:
@@ -460,18 +465,22 @@ for demand in demands:
         possible = check_drone_availibility(drone, timestamp)
         if not possible:
             continue
-        drone.occupy_update(timestamp, demand.del_to + return_time_taken)
-        demand.is_completed = True
         
-        drone.current_charge = drone.current_charge-energy-return_energy
-        time_for_full_recharge = np.ceil( ((drone.battery_capacity-drone.current_charge)/5000)*3600)
-        drone.battery_charged = drone.battery_capacity-drone.current_charge
-        drone.occupy_update(demand.del_to + return_time_taken,demand.del_to + return_time_taken+time_for_full_recharge)
-        drone.flight_time = drone.flight_time + time_taken + return_time_taken
-        drone.charge_time = drone.charge_time + time_for_full_recharge
-        drone.current_charge = drone.battery_capacity
-        print(path)
-        break
+        if total_energy > energy + return_energy:
+          total_energy = energy + return_energy
+          drone_pos = i_pos
+        
+    demand.is_completed = True
+    drones[drone_pos].occupy_update(timestamp, demand.del_to + return_time_taken)
+    drones[drone_pos].current_charge = drones[drone_pos].current_charge-energy-return_energy
+    time_for_full_recharge = np.ceil( ((drones[drone_pos].battery_capacity-drones[drone_pos].current_charge)/5000)*3600)
+    drones[drone_pos].battery_charged = drones[drone_pos].battery_capacity-drones[drone_pos].current_charge
+    drones[drone_pos].occupy_update(demand.del_to + return_time_taken,demand.del_to + return_time_taken+time_for_full_recharge)
+    drones[drone_pos].flight_time = drones[drone_pos].flight_time + time_taken + return_time_taken
+    drones[drone_pos].charge_time = drones[drone_pos].charge_time + time_for_full_recharge
+    drones[drone_pos].current_charge = drones[drone_pos].battery_capacity
+    print(path)
+        # break
     
     
     #print(f"{demand.demand_id} and {demand.is_completed}")
