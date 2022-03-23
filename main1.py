@@ -1,3 +1,5 @@
+from time import time
+from turtle import pos
 from utils import Drone, Item, Demand, NoFlyZone
 import pandas as pd
 import numpy as np
@@ -44,7 +46,7 @@ def get_seconds(hhmmss):
 
 def read_drone_details(path="./data/drone.xlsx", max_speed=10):
     drone_df = pd.read_excel(path)
-    cost_df = pd.read_excel('./data/cost_components.xlsx')
+    cost_df = pd.read_excel("./data/cost_components.xlsx")
     drone_objects = []
     print(cost_df.columns)
 
@@ -106,486 +108,6 @@ def check_weight_volume(drone, item):
 
 
 def calculate_starting_time_energy(drone, path, demand=dummy_demand):
-    fraction_payload = (demand.item.weight + demand.extra_weight) / drone.payload_weight
-    max_xy_speed = drone.max_speed - P[drone.type - 1] * fraction_payload
-    max_upward_speed = drone.max_speed - Q[drone.type - 1] * fraction_payload
-    max_downward_speed = drone.max_speed + Q[drone.type - 1] * fraction_payload
-    if max_xy_speed == 0:
-        print(drone.max_speed)
-        print(P[drone.type - 1])
-        print(fraction_payload)
-        print("yay")
-    total_time = 0
-    total_energy = 0
-    for i in range(len(path) - 1):
-        initial_pos = path[i]
-        final_pos = path[i + 1]
-        if final_pos[2] != initial_pos[2]:
-            distance = final_pos[2] - initial_pos[2]
-            if distance < 0:
-                time_taken = np.ceil(abs(distance) / max_downward_speed)
-                energy_consumed = (
-                    drone.current_weight
-                    * (DA[drone.type - 1] + DB[drone.type - 1] * max_downward_speed)
-                    * (time_taken - 1)
-                )
-                distance_left = abs(distance) - (time_taken - 1) * max_downward_speed
-                energy_consumed += drone.current_weight * (
-                    DA[drone.type - 1] + DB[drone.type - 1] * distance_left
-                )
-            else:
-                time_taken = np.ceil(distance / max_upward_speed)
-                distance_left = abs(distance) - (time_taken - 1) * max_upward_speed
-                energy_consumed = (
-                    drone.current_weight
-                    * (
-                        DA[drone.type - 1]
-                        + DB[drone.type - 1] * max_upward_speed
-                        + DC[drone.type - 1] * max_upward_speed
-                    )
-                    * (time_taken - 1)
-                )
-                energy_consumed += drone.current_weight * (
-                    DA[drone.type - 1]
-                    + DB[drone.type - 1] * distance_left
-                    + DC[drone.type - 1] * distance_left
-                )
-        else:
-            distance = np.sqrt(
-                (final_pos[0] - initial_pos[0]) ** 2
-                + (final_pos[1] - initial_pos[1]) ** 2
-            )
-            time_taken = np.ceil(distance / max_xy_speed)
-            distance_left = abs(distance) - (time_taken - 1) * max_xy_speed
-            energy_consumed = (
-                drone.current_weight
-                * (DA[drone.type - 1] + DB[drone.type - 1] * max_xy_speed)
-                * (time_taken - 1)
-            )
-            energy_consumed += drone.current_weight * (
-                DA[drone.type - 1] + DB[drone.type - 1] * distance_left
-            )
-
-        total_time += time_taken
-        total_energy += energy_consumed
-
-    reaching_time = demand.del_to - 180
-    starting_time = reaching_time - total_time
-    return starting_time, total_energy, total_time
-
-
-def check_drone_availibility(drone, timestamp):
-    return not drone.check_occupy(timestamp)
-
-
-def process_params(param_path="data/Scenario2/Parameters.csv"):
-
-    global M 
-    # Cost
-    global C 
-    # drone count
-    global drone_count 
-    # Warehouse Coordinates(x,y,z)
-    global wh 
-    # Recharge Stations(x,y,z)
-    global rhg 
-    # Drone params P
-    global P
-    # Drone Params Q
-    global Q
-    # Energy params A
-    global DA
-    # Energy parmas B
-    global DB
-    # Energy params C
-    global DC
-    # Demands
-    global demands
-    # No fly zones
-    global noflyzones
-
-    global n
-
-    parameters = pd.read_csv(param_path)
-
-    M = parameters.loc[parameters["Parameter_ID"] == "MaxSpeed (M)", "Value"].iloc[0]
-    C = parameters.loc[parameters["Parameter_ID"] == "Cost(C)", "Value"].iloc[0]
-
-    for i in range(1, 4):
-        df = parameters.loc[parameters["Parameter_ID"] == "WH" + str(i) + "X", "Value"]
-        if df.empty:
-            break
-        vx = parameters.loc[
-            parameters["Parameter_ID"] == "WH" + str(i) + "X", "Value"
-        ].iloc[0]
-        vy = parameters.loc[
-            parameters["Parameter_ID"] == "WH" + str(i) + "Y", "Value"
-        ].iloc[0]
-        vz = parameters.loc[
-            parameters["Parameter_ID"] == "WH" + str(i) + "Z", "Value"
-        ].iloc[0]
-        wh.append([vx, vy, vz])
-
-    for i in ascii_uppercase:
-        df = parameters.loc[parameters["Parameter_ID"] == i + "X1", "Value"]
-        if df.empty:
-            break
-        vx = parameters.loc[parameters["Parameter_ID"] == i + "X1", "Value"].iloc[0]
-        vy = parameters.loc[parameters["Parameter_ID"] == i + "Y1", "Value"].iloc[0]
-        rhg.append([vx, vy, 0.0])
-
-    for i in range(1, 7):
-        p = parameters.loc[parameters["Parameter_ID"] == "P" + str(i), "Value"].iloc[0]
-        q = parameters.loc[parameters["Parameter_ID"] == "Q" + str(i), "Value"].iloc[0]
-        a = parameters.loc[parameters["Parameter_ID"] == "A" + str(i), "Value"].iloc[0]
-        b = parameters.loc[parameters["Parameter_ID"] == "B" + str(i), "Value"].iloc[0]
-        c = parameters.loc[parameters["Parameter_ID"] == "C" + str(i), "Value"].iloc[0]
-        count = parameters.loc[
-            parameters["Parameter_ID"] == "DT" + str(i) + "Count", "Value"
-        ].iloc[0]
-        P[i - 1] = p
-        Q[i - 1] = q
-        DA[i - 1] = a
-        DB[i - 1] = b
-        DC[i - 1] = c
-        drone_count[i - 1] = count
-
-    for idx in range(1, 3):
-        zone = []
-        for i in range(1, 9):
-            df = parameters.loc[
-                parameters["Parameter_ID"] == "X" + str(idx) + str(i), "Value"
-            ]
-            if df.empty:
-                break
-            x = parameters.loc[
-                parameters["Parameter_ID"] == "X" + str(idx) + str(i), "Value"
-            ].iloc[0]
-            y = parameters.loc[
-                parameters["Parameter_ID"] == "Y" + str(idx) + str(i), "Value"
-            ].iloc[0]
-            z = parameters.loc[
-                parameters["Parameter_ID"] == "Z" + str(idx) + str(i), "Value"
-            ].iloc[0]
-            zone.append([x, y, z])
-        if len(zone) > 0:
-            noflyzones.append(NoFlyZone(zone))
-
-        n = len(noflyzones)
-
-
-def pathCoordinates(src, dest):
-    """
-    Return exact drone coornates for goinf from src to dest on straight line
-    """
-    pass
-
-
-def getPath(src, dest, drone, demand):
-
-    best_path = []
-    min_cost = 1e18
-    for z in range(0, 201):
-        cor = src
-        ok = True
-        path = [src]
-        if src[2] != z:
-            cor = [src[0], src[1], z]
-            path.append(cor)
-        for i in range(0, n):
-            if not noflyzones[i].doesIntersect(cor, [dest[0], dest[1], z]):
-                pass
-            else:
-                ok = False
-                break
-        if not ok:
-            continue
-        path.append([dest[0], dest[1], z])
-        if z != dest[2]:
-            path.append(dest)
-
-        # This is a valid path, check for best path
-
-        starting_time, energy_cost, time_taken = calculate_starting_time_energy(
-            drone, path, demand
-        )
-        if energy_cost < min_cost:
-            best_path = path
-            min_cost=energy_cost
-
-    if n == 0:
-        return best_path
-
-    if n == 1:
-        if not noflyzones[0].doesIntersect([src[0], src[1], 0], [dest[0], dest[1], 0]):
-            return best_path
-
-        coordinates = [
-            [noflyzones[0].mn[0], noflyzones[0].mn[1]],
-            [noflyzones[0].mn[0], noflyzones[0].mx[1]],
-            [noflyzones[0].mx[0], noflyzones[0].mn[1]],
-            [noflyzones[0].mx[0], noflyzones[0].mx[1]],
-        ]
-
-        for c in coordinates:
-
-            path = [src]
-
-            if noflyzones[0].doesIntersect(src, [c[0], c[1], src[2]]) or noflyzones[
-                0
-            ].doesIntersect([c[0], c[1], dest[2]], dest):
-                continue
-
-            path.append([c[0], c[1], src[2]])
-            path.append([dest[0], dest[1], src[2]])
-
-            if src[2] != dest[2]:
-                path.append(dest)
-
-            # Check for best path
-            starting_time, energy_cost, time_taken = calculate_starting_time_energy(
-                drone, path, demand
-            )
-            if energy_cost < min_cost:
-                best_path = path
-                min_cost=energy_cost
-
-        for c1 in coordinates:
-            for c2 in coordinates:
-                if c1 == c2:
-                    continue
-                if c1[0] != c2[0] and c1[1] != c2[1]:
-                    continue
-                path = [src]
-
-                if noflyzones[0].doesIntersect(
-                    src, [c1[0], c1[1], src[2]]
-                ) or noflyzones[0].doesIntersect([c2[0], c2[1], dest[2]], dest):
-                    continue
-
-                path.append([c1[0], c1[1], src[2]])
-                path.append([c2[0], c2[1], src[2]])
-                path.append([dest[0], dest[1], src[2]])
-
-                if src[2] != dest[2]:
-                    path.append(dest)
-
-                # Check for best path
-                starting_time, energy_cost, time_taken = calculate_starting_time_energy(
-                    drone, path, demand
-                )
-                if energy_cost < min_cost:
-                    best_path = path
-                    min_cost=energy_cost
-
-        return best_path
-    return best_path
-
-    # TO be complted
-    """
-  if n == 2:
-
-    coordinates1=[[noflyzones[0].mn[0],noflyzones[0].mn[1]],[noflyzones[0].mn[0],noflyzones[0].mx[1]],[noflyzones[0].mx[0],noflyzones[0].mn[1]],[noflyzones[0].mx[0],noflyzones[0].mx[1]]]
-    coordinates2=[[noflyzones[1].mn[0],noflyzones[1].mn[1]],[noflyzones[1].mn[0],noflyzones[1].mx[1]],[noflyzones[1].mx[0],noflyzones[1].mn[1]],[noflyzones[1].mx[0],noflyzones[1].mx[1]]]
-
-
-    for c in coordinates1:
-
-      if noflyzones[0].doesIntersect(src,[c[0],c[1],src[2]]) or noflyzones[0].doesIntersect([c[0],c[1],dest[2]],dest):
-        continue
-
-      path.append([c[0],c[1],src[2]])
-      path.append([dest[0],dest[1],src[2]])
-      
-      if src[2] != dest[2]:
-        path.append(dest)
-      
-      #Check for best path
-  """
-
-
-def simulate_travel(start,end,drone,demand,extra_demand=dummy_demand):
-    demand.item.weight += extra_demand.item.weight
-    demand.item.volume += extra_demand.item.volume
-    possible = check_weight_volume(drone, demand.item)
-    
-    if not possible:
-        demand.item.weight -= extra_demand.item.weight
-        demand.item.volume -= extra_demand.item.volume
-        return False, 0, 0, 0, []
-    drone.current_weight += demand.item.weight 
-    path = getPath(start, end, drone, demand)
-    timestamp, energy, time_taken = calculate_starting_time_energy(
-        drone, path, demand
-    )
-    drone.current_weight -= demand_item.weight 
-    demand.item.weight -= extra_demand.item.weight
-    demand.item.volume -= extra_demand.item.volume
-    return drone.current_charge >= energy, energy, timestamp, time_taken, path
-
-
-read_item_details()
-process_params()
-read_demands()
-dronetype_objects = read_drone_details(max_speed=M)
-drones = []
-for i in range(len(drone_count)):
-    for j in range(int(drone_count[i])):
-        drone_object = Drone(
-            dronetype_objects[i].type,
-            dronetype_objects[i].battery_capacity,
-            dronetype_objects[i].base_weight,
-            dronetype_objects[i].payload_weight,
-            dronetype_objects[i].payload_volume,
-            dronetype_objects[i].slots,
-            dronetype_objects[i].max_speed,
-            j,
-            dronetype_objects[i].maintenance_fixed_cost,
-            dronetype_objects[i].maintenance_variable_cost,
-        )
-        drones.append(drone_object)
-
-demands.sort(key=lambda x: x.del_to)
-print(len(demands))
-for index,demand in enumerate(demands):
-    # processing each demand
-    startpoint = wh[demand.wh - 1]
-    endpoint = [demand.x, demand.y, demand.z]
-    demand_item= demand.item
-    if demand.is_completed:
-        continue
-
-    print(demand.demand_id)
-    print(index)
-
-    found=False
-
-    for i in range(index+1,len(demands)):
-        if demands[i].is_completed:
-            continue
-        for drone in drones:
-            if drone.slots == 1:
-                continue
-            battery_used = 0.0
-            done, energy, timestamp, time_taken, path = simulate_travel(startpoint, endpoint, drone, demand, demands[i])
-            
-            battery_used += energy
-            if not done:
-                continue
-            sec_dest=[demands[i].x,demands[i].y,demands[i].z]
-            sec_done, sec_energy, sec_timestamp, sec_time_taken, sec_path = simulate_travel(endpoint, sec_dest, drone, demands[i])
-
-            if not sec_done or sec_timestamp < demand.del_to:
-                continue
-
-            battery_used += sec_energy
-
-            last_done, last_energy, last_timestamp, last_time_taken, last_path = simulate_travel(sec_dest, startpoint, drone, dummy_demand)
-
-            if not last_done:
-                continue
-
-            battery_used += last_energy
-
-            if battery_used > drone.current_charge:
-                continue
-
-            possible = check_drone_availibility(drone, timestamp)
-            if not possible:
-                continue
-            
-            demand.is_completed = True
-            demands[i].is_completed = True
-            found=True
-            
-            drone.current_charge = drone.current_charge-battery_used
-            time_for_full_recharge = np.ceil( ((drone.battery_capacity-drone.current_charge)/5000)*3600)
-            drone.battery_charged = drone.battery_capacity-drone.current_charge
-            drone.occupy_update(timestamp, demands[i].del_to + last_time_taken + time_for_full_recharge)
-            drone.flight_time = drone.flight_time + time_taken + sec_time_taken + last_time_taken
-            drone.charge_time = drone.charge_time + time_for_full_recharge
-            drone.current_charge = drone.battery_capacity
-            print(path)
-            print(sec_path)
-            print(last_path)
-            print(f"Demand {demand.demand_id} Met")
-            print(f"Demand {demands[i].demand_id} Met")
-            break
-        if found: 
-            break
-
-
-
-
-
-    if found:
-        continue
-    
-    for drone in drones:
-        battery_used=0.0
-        done, energy, timestamp, time_taken, path=simulate_travel(startpoint,endpoint,drone,demand)
-        battery_used += energy
-        
-        if not done:
-            continue
-
-        return_done, return_energy, return_timestamp, return_time_taken, return_path = simulate_travel(endpoint,startpoint,drone,dummy_demand)
-
-        battery_used += return_energy
-        
-        if not return_done or battery_used > drone.current_charge:
-            continue  
-
-        possible = check_drone_availibility(drone, timestamp)
-        if not possible:
-            continue
-        drone.occupy_update(timestamp, demand.del_to + return_time_taken)
-        demand.is_completed = True
-
-        
-        drone.current_charge = drone.current_charge-energy-return_energy
-        time_for_full_recharge = np.ceil( ((drone.battery_capacity-drone.current_charge)/5000)*3600)
-        drone.battery_charged = drone.battery_capacity-drone.current_charge
-        drone.occupy_update(demand.del_to + return_time_taken,demand.del_to + return_time_taken+time_for_full_recharge)
-        drone.flight_time = drone.flight_time + time_taken + return_time_taken
-        drone.charge_time = drone.charge_time + time_for_full_recharge
-        drone.current_charge = drone.battery_capacity
-        print(path)
-        break
-    
-    
-    #print(f"{demand.demand_id} and {demand.is_completed}")
-    
-    if demand.is_completed:
-        print(f"Demand {demand.demand_id} Met")
-    else:
-        print(f"Demand {demand.demand_id} not met.")
-
-def output_costs(day):
-    
-    Drone_Id=[]
-    Day=[]
-    Charging_Time = []
-    Resting_Time = []
-    Maintenance_Cost = []
-    Energy_Cost = []
-    for drone in drones:
-        # costs[drone.id][day]['flight_time']=drone.flight_time
-        Drone_Id.append(drone.id)
-        Day.append(day)
-        Charging_Time.append(drone.charge_time)
-        Resting_Time.append(14400-drone.flight_time)
-        Maintenance_Cost.append(drone.maintenance_fixed_cost+(drone.maintenance_variable_cost*drone.flight_time)/3600)
-        Energy_Cost.append((C*drone.battery_charged*drone.charge_time)/1000)
-    
-    df = pd.DataFrame({'DroneID':Drone_Id,'Day':Day,'Resting Time (s)':Resting_Time,'Charging time (s)':Charging_Time,'Maintenance Cost ($)':Maintenance_Cost,'Energy Cost ($)':Energy_Cost})
-    return df
-
-
-day1_costs = output_costs(1)
-day1_costs.to_csv("DroneCost_Output.csv",index=False)
-
-def output_path(path,drone,demand):
     fraction_payload = demand.item.weight / drone.payload_weight
     max_xy_speed = drone.max_speed - P[drone.type - 1] * fraction_payload
     max_upward_speed = drone.max_speed - Q[drone.type - 1] * fraction_payload
@@ -717,3 +239,468 @@ def output_path(path,drone,demand):
         timewise_speed,
     )
 
+
+def check_drone_availibility(drone, timestamp):
+    return not drone.check_occupy(timestamp)
+
+
+def process_params(param_path="data/Scenario2/Parameters.csv"):
+
+    global M
+    # Cost
+    global C
+    # drone count
+    global drone_count
+    # Warehouse Coordinates(x,y,z)
+    global wh
+    # Recharge Stations(x,y,z)
+    global rhg
+    # Drone params P
+    global P
+    # Drone Params Q
+    global Q
+    # Energy params A
+    global DA
+    # Energy parmas B
+    global DB
+    # Energy params C
+    global DC
+    # Demands
+    global demands
+    # No fly zones
+    global noflyzones
+
+    global n
+
+    parameters = pd.read_csv(param_path)
+
+    M = parameters.loc[parameters["Parameter_ID"] == "MaxSpeed (M)", "Value"].iloc[0]
+    C = parameters.loc[parameters["Parameter_ID"] == "Cost(C)", "Value"].iloc[0]
+
+    for i in range(1, 4):
+        df = parameters.loc[parameters["Parameter_ID"] == "WH" + str(i) + "X", "Value"]
+        if df.empty:
+            break
+        vx = parameters.loc[
+            parameters["Parameter_ID"] == "WH" + str(i) + "X", "Value"
+        ].iloc[0]
+        vy = parameters.loc[
+            parameters["Parameter_ID"] == "WH" + str(i) + "Y", "Value"
+        ].iloc[0]
+        vz = parameters.loc[
+            parameters["Parameter_ID"] == "WH" + str(i) + "Z", "Value"
+        ].iloc[0]
+        wh.append([vx, vy, vz])
+
+    for i in ascii_uppercase:
+        df = parameters.loc[parameters["Parameter_ID"] == i + "X1", "Value"]
+        if df.empty:
+            break
+        vx = parameters.loc[parameters["Parameter_ID"] == i + "X1", "Value"].iloc[0]
+        vy = parameters.loc[parameters["Parameter_ID"] == i + "Y1", "Value"].iloc[0]
+        rhg.append([vx, vy, 0.0])
+
+    for i in range(1, 7):
+        p = parameters.loc[parameters["Parameter_ID"] == "P" + str(i), "Value"].iloc[0]
+        q = parameters.loc[parameters["Parameter_ID"] == "Q" + str(i), "Value"].iloc[0]
+        a = parameters.loc[parameters["Parameter_ID"] == "A" + str(i), "Value"].iloc[0]
+        b = parameters.loc[parameters["Parameter_ID"] == "B" + str(i), "Value"].iloc[0]
+        c = parameters.loc[parameters["Parameter_ID"] == "C" + str(i), "Value"].iloc[0]
+        count = parameters.loc[
+            parameters["Parameter_ID"] == "DT" + str(i) + "Count", "Value"
+        ].iloc[0]
+        P[i - 1] = p
+        Q[i - 1] = q
+        DA[i - 1] = a
+        DB[i - 1] = b
+        DC[i - 1] = c
+        drone_count[i - 1] = count
+
+    for idx in range(1, 3):
+        zone = []
+        for i in range(1, 9):
+            df = parameters.loc[
+                parameters["Parameter_ID"] == "X" + str(idx) + str(i), "Value"
+            ]
+            if df.empty:
+                break
+            x = parameters.loc[
+                parameters["Parameter_ID"] == "X" + str(idx) + str(i), "Value"
+            ].iloc[0]
+            y = parameters.loc[
+                parameters["Parameter_ID"] == "Y" + str(idx) + str(i), "Value"
+            ].iloc[0]
+            z = parameters.loc[
+                parameters["Parameter_ID"] == "Z" + str(idx) + str(i), "Value"
+            ].iloc[0]
+            zone.append([x, y, z])
+        if len(zone) > 0:
+            noflyzones.append(NoFlyZone(zone))
+
+        n = len(noflyzones)
+
+
+def pathCoordinates(src, dest):
+    """
+    Return exact drone coornates for goinf from src to dest on straight line
+    """
+    pass
+
+
+def getPath(src, dest, drone, demand):
+
+    best_path = []
+    min_cost = 1e18
+    for z in range(0, 201):
+        cor = src
+        ok = True
+        path = [src]
+        if src[2] != z:
+            cor = [src[0], src[1], z]
+            path.append(cor)
+        for i in range(0, n):
+            if not noflyzones[i].doesIntersect(cor, [dest[0], dest[1], z]):
+                pass
+            else:
+                ok = False
+                break
+        if not ok:
+            continue
+        path.append([dest[0], dest[1], z])
+        if z != dest[2]:
+            path.append(dest)
+
+        # This is a valid path, check for best path
+
+        (
+            starting_time,
+            energy_cost,
+            time_taken,
+            path_timewise,
+            energy_timewise,
+            speed_timewise,
+        ) = calculate_starting_time_energy(drone, path, demand)
+
+        energy_cost = 0
+
+        if energy_cost < min_cost:
+            best_path = path
+            min_cost = energy_cost
+
+    if n == 0:
+        return best_path
+
+    if n == 1:
+        if not noflyzones[0].doesIntersect([src[0], src[1], 0], [dest[0], dest[1], 0]):
+            return best_path
+
+        coordinates = [
+            [noflyzones[0].mn[0], noflyzones[0].mn[1]],
+            [noflyzones[0].mn[0], noflyzones[0].mx[1]],
+            [noflyzones[0].mx[0], noflyzones[0].mn[1]],
+            [noflyzones[0].mx[0], noflyzones[0].mx[1]],
+        ]
+
+        for c in coordinates:
+
+            path = [src]
+
+            if noflyzones[0].doesIntersect(src, [c[0], c[1], src[2]]) or noflyzones[
+                0
+            ].doesIntersect([c[0], c[1], dest[2]], dest):
+                continue
+
+            path.append([c[0], c[1], src[2]])
+            path.append([dest[0], dest[1], src[2]])
+
+            if src[2] != dest[2]:
+                path.append(dest)
+
+            # Check for best path
+            (
+                starting_time,
+                energy_cost,
+                time_taken,
+                path_timewise,
+                energy_timewise,
+                speed_timewise,
+            ) = calculate_starting_time_energy(drone, path, demand)
+
+            if energy_cost < min_cost:
+                best_path = path
+                min_cost = energy_cost
+
+        for c1 in coordinates:
+            for c2 in coordinates:
+                if c1 == c2:
+                    continue
+                if c1[0] != c2[0] and c1[1] != c2[1]:
+                    continue
+                path = [src]
+
+                if noflyzones[0].doesIntersect(
+                    src, [c1[0], c1[1], src[2]]
+                ) or noflyzones[0].doesIntersect([c2[0], c2[1], dest[2]], dest):
+                    continue
+
+                path.append([c1[0], c1[1], src[2]])
+                path.append([c2[0], c2[1], src[2]])
+                path.append([dest[0], dest[1], src[2]])
+
+                if src[2] != dest[2]:
+                    path.append(dest)
+
+                # Check for best path
+                (
+                    starting_time,
+                    energy_cost,
+                    time_taken,
+                    path_timewise,
+                    energy_timewise,
+                    speed_timewise,
+                ) = calculate_starting_time_energy(drone, path, demand)
+                if energy_cost < min_cost:
+                    best_path = path
+                    min_cost = energy_cost
+
+        return best_path
+    return best_path
+
+    # TO be complted
+    """
+  if n == 2:
+
+    coordinates1=[[noflyzones[0].mn[0],noflyzones[0].mn[1]],[noflyzones[0].mn[0],noflyzones[0].mx[1]],[noflyzones[0].mx[0],noflyzones[0].mn[1]],[noflyzones[0].mx[0],noflyzones[0].mx[1]]]
+    coordinates2=[[noflyzones[1].mn[0],noflyzones[1].mn[1]],[noflyzones[1].mn[0],noflyzones[1].mx[1]],[noflyzones[1].mx[0],noflyzones[1].mn[1]],[noflyzones[1].mx[0],noflyzones[1].mx[1]]]
+
+
+    for c in coordinates1:
+
+      if noflyzones[0].doesIntersect(src,[c[0],c[1],src[2]]) or noflyzones[0].doesIntersect([c[0],c[1],dest[2]],dest):
+        continue
+
+      path.append([c[0],c[1],src[2]])
+      path.append([dest[0],dest[1],src[2]])
+      
+      if src[2] != dest[2]:
+        path.append(dest)
+      
+      #Check for best path
+  """
+
+
+read_item_details()
+process_params()
+read_demands()
+dronetype_objects = read_drone_details(max_speed=M)
+drones = []
+for i in range(len(drone_count)):
+    for j in range(int(drone_count[i])):
+        drone_object = Drone(
+            dronetype_objects[i].type,
+            dronetype_objects[i].battery_capacity,
+            dronetype_objects[i].base_weight,
+            dronetype_objects[i].payload_weight,
+            dronetype_objects[i].payload_volume,
+            dronetype_objects[i].slots,
+            dronetype_objects[i].max_speed,
+            j,
+            dronetype_objects[i].maintenance_fixed_cost,
+            dronetype_objects[i].maintenance_variable_cost,
+        )
+        drones.append(drone_object)
+
+demands.sort(key=lambda x: x.del_to)
+ctr = 0
+print(len(demands))
+for demand in demands:
+    # processing each demand
+    startpoint = wh[demand.wh - 1]
+    endpoint = [demand.x, demand.y, demand.z]
+    demand_item = demand.item
+    print(ctr)
+    ctr += 1
+    print(demand.demand_id)
+
+    total_energy = 10 ** 9
+    i_pos, drone_pos = -1, 0
+    best_timestamp = 0
+    best_return_time_taken = 0
+    best_energy = 0
+    best_return_energy = 0
+    best_path_timewise = None
+    best_energy_timewise = None
+    best_return_path_timewise = None
+    best_return_energy_timewise = None
+    best_timetaken = None
+    best_speed_timewise = None
+    best_return_speed_timewise = None
+    best_path = None
+    best_return_path = None
+
+    for drone in drones:
+        i_pos += 1
+        possible = check_weight_volume(drone, demand_item)
+        drone.current_weight += demand_item.weight
+        if not possible:
+            continue
+        # wrong
+        # drone.current_charge = drone.battery_capacity
+        path = getPath(startpoint, endpoint, drone, demand)
+        print(path)
+        (
+            timestamp,
+            energy,
+            time_taken,
+            path_timewise,
+            energy_timewise,
+            speed_timewise,
+        ) = calculate_starting_time_energy(drone, path, demand)
+        drone.current_weight -= demand_item.weight
+        return_path = getPath(endpoint, startpoint, drone, dummy_demand)
+        (
+            timestamp_return,
+            return_energy,
+            return_time_taken,
+            path_return_timewise,
+            energy_return_timewise,
+            speed_return_timewise,
+        ) = calculate_starting_time_energy(drone, return_path, dummy_demand)
+        if energy + return_energy > drone.current_charge:
+            continue
+        possible = check_drone_availibility(drone, timestamp)
+        if not possible:
+            continue
+
+        if total_energy > energy + return_energy:
+            total_energy = energy + return_energy
+            drone_pos = i_pos
+            best_timestamp = timestamp
+            best_timetaken = time_taken
+            best_return_time_taken = return_time_taken
+            best_energy = energy
+            best_return_energy = return_energy
+            best_path_timewise = path_timewise
+            best_energy_timewise = energy_timewise
+            best_return_path_timewise = path_return_timewise
+            best_return_energy_timewise = energy_return_timewise
+            best_speed_timewise = speed_timewise
+            best_return_speed_timewise = speed_return_timewise
+            best_path = path
+            best_return_path = return_path
+
+    print(best_path)
+    demand.is_completed = True
+    drones[drone_pos].occupy_update(timestamp, demand.del_to + best_return_time_taken)
+    drones[drone_pos].current_charge = (
+        drones[drone_pos].current_charge - best_energy - best_return_energy
+    )
+    time_for_full_recharge = np.ceil(
+        ((drones[drone_pos].battery_capacity - drones[drone_pos].current_charge) / 5000)
+        * 3600
+    )
+    drones[drone_pos].battery_charged = (
+        drones[drone_pos].battery_capacity - drones[drone_pos].current_charge
+    )
+    drones[drone_pos].occupy_update(
+        demand.del_to + best_return_time_taken,
+        demand.del_to + best_return_time_taken + time_for_full_recharge,
+    )
+    drones[drone_pos].flight_time = (
+        drones[drone_pos].flight_time + time_taken + return_time_taken
+    )
+    drones[drone_pos].charge_time = (
+        drones[drone_pos].charge_time + time_for_full_recharge
+    )
+    drones[drone_pos].current_charge = drones[drone_pos].battery_capacity
+    # break
+
+    # Adding everything to drone
+    for j in range(int(timestamp), int(best_timetaken) + 1):
+        drone.x_s[j] = best_path_timewise[j - timestamp][0]
+        drone.y_s[j] = best_path_timewise[j - timestamp][1]
+        drone.z_s[j] = best_path_timewise[j - timestamp][2]
+        drone.speed_s[j] = best_speed_timewise[j - timestamp]
+        drone.energy_mah[j] = best_energy_timewise[j - timestamp]
+        drone.weights[j] = drone.base_weight + demand_item.weight
+        drone.activity[j] = "T-L"
+
+    for j in range(int(best_timetaken) + 1, int(best_timetaken) + 181):
+        drone.x_s[j] = best_path_timewise[-1][0]
+        drone.y_s[j] = best_path_timewise[-1][1]
+        drone.z_s[j] = best_path_timewise[-1][2]
+        drone.speed_s[j] = 0
+        drone.energy_mah[j] = 0
+        drone.weights[j] = drone.base_weight + demand_item.weight
+        drone.activity[j] = demand.demand_id
+
+    best_timetaken = int(best_timetaken)
+    for j in range(
+        int(best_timetaken) + 181,
+        int(best_timetaken) + 181 + int(best_return_time_taken),
+    ):
+        drone.x_s[j] = best_return_path_timewise[j - best_timetaken - 181][0]
+        drone.y_s[j] = best_path_timewise[j - best_timetaken - 181][1]
+        drone.z_s[j] = best_path_timewise[j - best_timetaken - 181][2]
+        drone.speed_s[j] = best_return_speed_timewise[j - best_timetaken - 181]
+        drone.energy_mah[j] = best_return_energy_timewise[j - best_timetaken - 181]
+        drone.weights[j] = drone.base_weight
+        drone.activity[j] = "T-E"
+
+    # print(f"{demand.demand_id} and {demand.is_completed}")
+
+    if demand.is_completed:
+        print(f"Demand {demand.demand_id} Met")
+    else:
+        print(f"Demand {demand.demand_id} not met.")
+
+
+def output_costs(day):
+
+    Drone_Id = []
+    Day = []
+    Charging_Time = []
+    Resting_Time = []
+    Maintenance_Cost = []
+    Energy_Cost = []
+    for drone in drones:
+        # costs[drone.id][day]['flight_time']=drone.flight_time
+        Drone_Id.append(drone.id)
+        Day.append(day)
+        Charging_Time.append(drone.charge_time)
+        Resting_Time.append(14400 - drone.flight_time)
+        Maintenance_Cost.append(
+            round(
+                drone.maintenance_fixed_cost
+                + (drone.maintenance_variable_cost * drone.flight_time) / 3600,
+                2,
+            )
+        )
+        Energy_Cost.append(
+            round((C * drone.battery_charged * drone.charge_time) / 1000, 2)
+        )
+
+    df = pd.DataFrame(
+        {
+            "DroneID": Drone_Id,
+            "Day": Day,
+            "Resting Time (s)": Resting_Time,
+            "Charging time (s)": Charging_Time,
+            "Maintenance Cost ($)": Maintenance_Cost,
+            "Energy Cost ($)": Energy_Cost,
+        }
+    )
+    return df
+
+
+"""
+def update_timeline(day):
+
+  for drone in drones:
+"""
+
+
+day1_costs = output_costs(1)
+day2_costs = output_costs(2)
+final_costs_df = pd.concat([day1_costs, day2_costs], axis=0)
+final_costs_df.to_csv("DroneCost_Output.csv", index=False)
