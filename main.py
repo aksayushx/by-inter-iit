@@ -824,7 +824,7 @@ def create_path_df():
 
 
 day1_costs = output_costs(1)
-day1_costs.to_csv("DroneCost_Output.csv",index=False)
+day1_costs.to_csv(f"data/Scenario{sys.argv[1]}/DroneCost_Output.csv",index=False)
 create_path_df()
 
 
