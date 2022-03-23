@@ -926,16 +926,16 @@ def create_path_df(day):
 
     cost_energy = [C*energy for energy in energy_vals]
     df = pd.DataFrame({"DroneID":drone_ids, "Day":days, "Time (In Seconds)":timestamps, "X":x_coord, "Y":y_coord, "Z":z_coord, "Activity":activities, "Speed (m/s)":speed_vals, "mAh Consumed":energy_vals, "Energy Cost (c x mAh)":cost_energy, "Total Weight (kgs)":weights})
-    df.to_csv("./DronePath_Output.csv", index=False)
+    df.to_csv(f"data/Scenario{sys.argv[1]}/DronePath_Day{sys.argv[2]}_Output.csv", index=False)
 
 
 
 
-day1_costs = output_costs(1)
+day1_costs = output_costs(sys.argv[2])
 
 
-day1_costs.to_csv(f"data/Scenario{sys.argv[1]}/DroneCost_Output.csv",index=False)
-create_path_df(1)
+day1_costs.to_csv(f"data/Scenario{sys.argv[1]}/DroneCost_Day{sys.argv[2]}_Output.csv",index=False)
+create_path_df(sys.argv[2])
 
 
 
