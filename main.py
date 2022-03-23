@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from string import ascii_uppercase
 from copy import deepcopy
-
+import sys
 # Max Speed
 M = 0.0
 # Cost
@@ -78,8 +78,12 @@ def read_item_details(path="./data/items.xlsx"):
         )
         itemtype_objects.append(item_object)
 
+if sys.argv[1]=='1':
+    demand_file=f"data/Scenario{sys.argv[1]}/Demand.csv"
+else:
+    demand_file=f"data/Scenario{sys.argv[1]}/Demand_Day{sys.argv[1]}.csv"
 
-def read_demands(demands_path="data/Scenario2/Demand_Day1.csv"):
+def read_demands(demands_path=demand_file):
 
     global demands
     demand = pd.read_csv(demands_path)
@@ -245,7 +249,8 @@ def output_path(path2,drone,demand):
     
     return timewise_path, timewise_energy, timewise_speed
 
-def process_params(param_path="data/Scenario2/Parameters.csv"):
+
+def process_params(param_path=f"data/Scenario{sys.argv[1]}/Parameters.csv"):
 
     global M 
     # Cost
