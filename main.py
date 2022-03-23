@@ -1,3 +1,4 @@
+from time import time
 from utils import Drone, Item, Demand, NoFlyZone
 import pandas as pd
 import numpy as np
@@ -586,7 +587,7 @@ demands.sort(key=lambda x: x.del_to)
 print(len(demands))
 for index,demand in enumerate(demands):
     # processing each demand
-    startpoint = wh[demand.wh - 1]
+    startpoint = wh[0]
     endpoint = [demand.x, demand.y, demand.z]
     demand_item= demand.item
     if demand.is_completed:
@@ -600,11 +601,22 @@ for index,demand in enumerate(demands):
     for i in range(index+1,len(demands)):
         if demands[i].is_completed:
             continue
+        if demand.wh != demands[i].wh:
+            continue
         for drone in drones:
             if drone.slots == 1:
                 continue
+            wh_done, wh_energy, wh_timestamp, wh_time_taken, wh_path = False, 0, 0, 0, []
+
             battery_used = 0.0
-            done, energy, timestamp, time_taken, path = simulate_travel(startpoint, endpoint, drone, demand, demands[i])
+            if demand.wh != 1:
+              wh_done, wh_energy, wh_timestamp, wh_time_taken, wh_path = simulate_travel(startpoint, wh[demand.wh - 1], drone, dummy_demand)
+              if not wh_done:
+                continue
+              battery_used += wh_energy
+
+            done, energy, timestamp, time_taken, path = simulate_travel(wh[demand.wh - 1], endpoint, drone, demand, demands[i])
+            
             
             battery_used += energy
             if not done:
@@ -627,7 +639,7 @@ for index,demand in enumerate(demands):
             if battery_used > drone.current_charge:
                 continue
 
-            possible = check_drone_availibility(drone, timestamp)
+            possible = check_drone_availibility(drone, timestamp - wh_time_taken)
             if not possible:
                 continue
             
@@ -638,21 +650,24 @@ for index,demand in enumerate(demands):
             drone.current_charge = drone.current_charge-battery_used
             time_for_full_recharge = np.ceil( ((drone.battery_capacity-drone.current_charge)/5000)*3600)
             drone.battery_charged = drone.battery_capacity-drone.current_charge
-            drone.occupy_update(timestamp, demands[i].del_to + last_time_taken + time_for_full_recharge)
-            drone.flight_time = drone.flight_time + time_taken + sec_time_taken + last_time_taken
+            
+            # Add extended path
+            drone.occupy_update(timestamp - wh_time_taken, demands[i].del_to + last_time_taken + time_for_full_recharge)
+            drone.flight_time = drone.flight_time + time_taken + sec_time_taken + last_time_taken + wh_time_taken
+            
             drone.charge_time = drone.charge_time + time_for_full_recharge
             drone.current_charge = drone.battery_capacity
 
             charge_start_time = int(demands[i].del_to+last_time_taken)
             time_for_full_recharge = int(time_for_full_recharge)
             for index in range(time_for_full_recharge):
-                drone.x_s[charge_start_time+index] = wh[demand.wh-1][0]
-                drone.y_s[charge_start_time+index] = wh[demand.wh-1][1]
-                drone.z_s[charge_start_time+index] = wh[demand.wh-1][2]
+                drone.x_s[charge_start_time+index] = wh[0][0]
+                drone.y_s[charge_start_time+index] = wh[0][1]
+                drone.z_s[charge_start_time+index] = wh[0][2]
                 drone.speed_s[charge_start_time+index] = 0
                 drone.energy_mah[charge_start_time+index] = 0
                 drone.weights[charge_start_time+index] = drone.base_weight
-                drone.activity[charge_start_time+index] = 'C-WH' + str(demand.wh)
+                drone.activity[charge_start_time+index] = 'C-WH1'
 
             prev_weight = demand.item.weight
             demand.item.weight += demands[i].item.weight
@@ -668,9 +683,31 @@ for index,demand in enumerate(demands):
             sec_time_taken = int(sec_time_taken)
             last_time_taken = int(last_time_taken)
             time_counter = starting_time
+            
+            print(wh_path)
+            print(path)
+            print(sec_path)
+            print(last_path)
+
+            if demand.wh !=1 :
+                (starting_wh_time, wh_energy, wh_time_taken, timewise_wh_path, timewise_wh_energy, timewise_wh_speed) = output_path(wh_path, drone, dummy_demand)
+                wh_time_taken=int(wh_time_taken)
+                starting_wh_time=int(time_counter-wh_time_taken-180)
+                time_counter=starting_wh_time
+                for index in range(len(timewise_wh_path)):
+                    drone.x_s[time_counter] = timewise_wh_path[index][0]
+                    drone.y_s[time_counter] = timewise_wh_path[index][1]
+                    drone.z_s[time_counter] = timewise_wh_path[index][2]
+                    drone.speed_s[time_counter] = timewise_wh_speed[index]
+                    drone.energy_mah[time_counter] = timewise_wh_energy[index]
+                    drone.weights[time_counter] = drone.base_weight
+                    drone.activity[time_counter] = "T-E"
+                    time_counter += 1
+                
 
             for index in range(180):
                 if time_counter - index < 0:
+                    print("******")
                     break
                 drone.x_s[time_counter-index] = wh[demand.wh-1][0]
                 drone.y_s[time_counter-index] = wh[demand.wh-1][1]
@@ -736,6 +773,7 @@ for index,demand in enumerate(demands):
             
             print(f"Demand {demand.demand_id} Met")
             print(f"Demand {demands[i].demand_id} Met")
+
             break
         if found: 
             break
@@ -748,8 +786,17 @@ for index,demand in enumerate(demands):
         continue
     
     for drone in drones:
+        
         battery_used=0.0
-        done, energy, timestamp, time_taken, path=simulate_travel(startpoint,endpoint,drone,demand)
+        wh_done, wh_energy, wh_timestamp, wh_time_taken, wh_path = False, 0, 0, 0, [] 
+        if demand.wh != 1:
+            wh_done, wh_energy, wh_timestamp, wh_time_taken, wh_path = simulate_travel(startpoint, wh[demand.wh - 1], drone, dummy_demand)
+            if not wh_done:
+                continue
+            battery_used += wh_energy
+
+        done, energy, timestamp, time_taken, path=simulate_travel(wh[demand.wh - 1], endpoint, drone, demand)
+
         battery_used += energy
         
         if not done:
@@ -762,35 +809,35 @@ for index,demand in enumerate(demands):
         if not return_done or battery_used > drone.current_charge:
             continue  
 
-        possible = check_drone_availibility(drone, timestamp)
+        possible = check_drone_availibility(drone, timestamp - wh_time_taken)
         if not possible:
             continue
-        drone.occupy_update(timestamp, demand.del_to + return_time_taken)
         demand.is_completed = True
 
         
-        drone.current_charge = drone.current_charge-energy-return_energy
+        drone.current_charge = drone.current_charge - battery_used
         time_for_full_recharge = np.ceil( ((drone.battery_capacity-drone.current_charge)/5000)*3600)
         drone.battery_charged = drone.battery_capacity-drone.current_charge
-        drone.occupy_update(demand.del_to + return_time_taken,demand.del_to + return_time_taken+time_for_full_recharge)
-        drone.flight_time = drone.flight_time + time_taken + return_time_taken
+        drone.occupy_update(timestamp - wh_time_taken,demand.del_to + return_time_taken+time_for_full_recharge)
+        drone.flight_time = drone.flight_time + time_taken + return_time_taken + wh_time_taken
         drone.charge_time = drone.charge_time + time_for_full_recharge
         drone.current_charge = drone.battery_capacity
 
         charge_start_time = int(demand.del_to+return_time_taken)
         time_for_full_recharge = int(time_for_full_recharge)
 
+
         for index in range(time_for_full_recharge):
-            drone.x_s[charge_start_time+index] = wh[demand.wh-1][0]
-            drone.y_s[charge_start_time+index] = wh[demand.wh-1][1]
-            drone.z_s[charge_start_time+index] = wh[demand.wh-1][2]
+            drone.x_s[charge_start_time+index] = wh[0][0]
+            drone.y_s[charge_start_time+index] = wh[0][1]
+            drone.z_s[charge_start_time+index] = wh[0][2]
             drone.speed_s[charge_start_time+index] = 0
             drone.energy_mah[charge_start_time+index] = 0
             drone.weights[charge_start_time+index] = drone.base_weight
-            drone.activity[charge_start_time+index] = 'C-WH' + str(demand.wh)
-
-
-        print(path)
+            drone.activity[charge_start_time+index] = 'C-WH1'
+        # print(demand.wh)
+        # print(wh_path)
+        # print(path)
         (starting_time, energy, time_taken, timewise_path, timewise_energy, timewise_speed) = output_path(path, drone, demand)
         (starting_return_time, return_energy, return_time_taken, return_timewise_path, return_timewise_energy, return_timewise_speed) = output_path(path, drone, demand)
 
@@ -799,6 +846,22 @@ for index,demand in enumerate(demands):
         time_taken = int(time_taken)
         return_time_taken = int(return_time_taken)
         time_counter = starting_time
+
+
+        if demand.wh !=1 :
+            (starting_wh_time, wh_energy, wh_time_taken, timewise_wh_path, timewise_wh_energy, timewise_wh_speed) = output_path(wh_path, drone, dummy_demand)
+            wh_time_taken=int(wh_time_taken)
+            starting_wh_time=int(time_counter-wh_time_taken-180)
+            time_counter=starting_wh_time
+            for index in range(len(timewise_wh_path)):
+                drone.x_s[time_counter] = timewise_wh_path[index][0]
+                drone.y_s[time_counter] = timewise_wh_path[index][1]
+                drone.z_s[time_counter] = timewise_wh_path[index][2]
+                drone.speed_s[time_counter] = timewise_wh_speed[index]
+                drone.energy_mah[time_counter] = timewise_wh_energy[index]
+                drone.weights[time_counter] = drone.base_weight
+                drone.activity[time_counter] = "T-E"
+                time_counter += 1
 
         for index in range(180):
             if time_counter - index < 0:
@@ -810,6 +873,7 @@ for index,demand in enumerate(demands):
             drone.energy_mah[time_counter-index] = 0
             drone.weights[time_counter-index] = drone.base_weight
             drone.activity[time_counter-index] = "PU-WH"+str(demand.wh)
+
 
         for index in range(len(timewise_path)):
             drone.x_s[time_counter] = timewise_path[index][0]
