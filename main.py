@@ -1,4 +1,3 @@
-from this import d
 from utils import Drone, Item, Demand, NoFlyZone
 import pandas as pd
 import numpy as np
@@ -45,7 +44,10 @@ def get_seconds(hhmmss):
 
 def read_drone_details(path="./data/drone.xlsx", max_speed=10):
     drone_df = pd.read_excel(path)
+    cost_df = pd.read_excel('./data/cost_components.xlsx')
     drone_objects = []
+    print(cost_df.columns)
+
     for i in range(drone_df.shape[0]):
         drone_object = Drone(
             i + 1,
@@ -53,9 +55,11 @@ def read_drone_details(path="./data/drone.xlsx", max_speed=10):
             drone_df["Base Weight (kg)"][i],
             drone_df["Payload Capacity (KG)"][i],
             drone_df["Payload Capacity (cu.cm)"][i],
-            drone_df["Max Slots"],
+            drone_df["Max Slots"][i],
             max_speed,
             0,
+            cost_df["Maintenance Fixed Cost (per day)"][i],
+            cost_df["Maintenance Variable Cost (per hour of flight time)"][i],
         )
         drone_objects.append(drone_object)
     return drone_objects
@@ -416,6 +420,8 @@ for i in range(len(drone_count)):
             dronetype_objects[i].slots,
             dronetype_objects[i].max_speed,
             j,
+            dronetype_objects[i].maintenance_fixed_cost,
+            dronetype_objects[i].maintenance_variable_cost,
         )
         drones.append(drone_object)
 
@@ -433,15 +439,17 @@ for demand in demands:
     
     for drone in drones:
         possible = check_weight_volume(drone, demand_item)
+        drone.current_weight += demand_item.weight
         if not possible:
             continue
         # wrong
         # drone.current_charge = drone.battery_capacity
         path = getPath(startpoint, endpoint, drone, demand)
-        return_path = getPath(endpoint, startpoint, drone, dummy_demand)
         timestamp, energy, time_taken = calculate_starting_time_energy(
             drone, path, demand
         )
+        drone.current_weight-=demand_item.weight
+        return_path = getPath(endpoint, startpoint, drone, dummy_demand)
         (
             timestamp_return,
             return_energy,
@@ -472,12 +480,27 @@ for demand in demands:
         print(f"Demand {demand.demand_id} Met")
     else:
         print(f"Demand {demand.demand_id} not met.")
-    
-costs={}
+
 def output_costs(day):
+    
+    Drone_Id=[]
+    Day=[]
+    Charging_Time = []
+    Resting_Time = []
+    Maintenance_Cost = []
+    Energy_Cost = []
     for drone in drones:
-        costs[drone.id][day]['flight_time']=drone.flight_time
-        costs[drone.id][day]['resting_time']=14400-drone.flight_time
-        costs[drone.id][day]['charging_time']=drone.charging_time
-        costs[drone.id][day]['maintenance_variable_cost']=(drone.maintenance_variable_cost*drone.flight_time)/3600
-        costs[drone.id][day]['energy_cost']=(C*drone.battery_charged*drone.charging_time)/1000
+        # costs[drone.id][day]['flight_time']=drone.flight_time
+        Drone_Id.append(drone.id)
+        Day.append(day)
+        Charging_Time.append(drone.charge_time)
+        Resting_Time.append(14400-drone.flight_time)
+        Maintenance_Cost.append(drone.maintenance_fixed_cost+(drone.maintenance_variable_cost*drone.flight_time)/3600)
+        Energy_Cost.append((C*drone.battery_charged*drone.charge_time)/1000)
+    
+    df = pd.DataFrame({'DroneID':Drone_Id,'Day':Day,'Resting Time (s)':Resting_Time,'Charging time (s)':Charging_Time,'Maintenance Cost ($)':Maintenance_Cost,'Energy Cost ($)':Energy_Cost})
+    return df
+
+day1_costs = output_costs(1)
+day1_costs.to_csv("DroneCost_Output.csv",index=False)
+

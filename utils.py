@@ -14,6 +14,8 @@ class Drone:
         slots,
         max_speed,
         id,
+        maintenance_fixed_cost,
+        maintenance_variable_cost,
     ):
 
         self.type = type
@@ -37,9 +39,10 @@ class Drone:
         self.flight_time = 0
         self.rest_time = 0
         self.warehouse = 0
-        self.maintenance_fixed_cost = 0
-        self.maintenance_variable_cost = 0
+        self.maintenance_fixed_cost = maintenance_fixed_cost
+        self.maintenance_variable_cost = maintenance_variable_cost
         self.occupied_slots = []
+        self.battery_charged = battery_capacity
 
     def occupy_update(self, starting_time, ending_time):
 
