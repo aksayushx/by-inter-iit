@@ -1,4 +1,3 @@
-from tracemalloc import start
 from turtle import pos
 from utils import Drone, Item, Demand, NoFlyZone
 import pandas as pd
