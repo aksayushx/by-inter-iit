@@ -33,7 +33,12 @@ class Drone:
         self.x = 0
         self.y = 0
         self.z = 0
-
+        self.charge_time = 0
+        self.flight_time = 0
+        self.rest_time = 0
+        self.warehouse = 0
+        self.maintenance_fixed_cost = 0
+        self.maintenance_variable_cost = 0
         self.occupied_slots = []
 
     def occupy_update(self, starting_time, ending_time):

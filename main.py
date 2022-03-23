@@ -1,3 +1,4 @@
+from this import d
 from utils import Drone, Item, Demand, NoFlyZone
 import pandas as pd
 import numpy as np
@@ -73,7 +74,7 @@ def read_item_details(path="./data/items.xlsx"):
         itemtype_objects.append(item_object)
 
 
-def read_demands(demands_path="data/Scenario3/Demand_Day1.csv"):
+def read_demands(demands_path="data/Scenario2/Demand_Day1.csv"):
 
     global demands
     demand = pd.read_csv(demands_path)
@@ -173,7 +174,7 @@ def check_drone_availibility(drone, timestamp):
     return not drone.check_occupy(timestamp)
 
 
-def process_params(param_path="data/Scenario3/Parameters.csv"):
+def process_params(param_path="data/Scenario2/Parameters.csv"):
 
     global M 
     # Cost
@@ -453,6 +454,14 @@ for demand in demands:
             continue
         drone.occupy_update(timestamp, demand.del_to + return_time_taken)
         demand.is_completed = True
+        
+        drone.current_charge = drone.current_charge-energy-return_energy
+        time_for_full_recharge = np.ceil( ((drone.battery_capacity-drone.current_charge)/5000)*3600)
+        drone.battery_charged = drone.battery_capacity-drone.current_charge
+        drone.occupy_update(demand.del_to + return_time_taken,demand.del_to + return_time_taken+time_for_full_recharge)
+        drone.flight_time = drone.flight_time + time_taken + return_time_taken
+        drone.charge_time = drone.charge_time + time_for_full_recharge
+        drone.current_charge = drone.battery_capacity
         print(path)
         break
     
@@ -464,3 +473,11 @@ for demand in demands:
     else:
         print(f"Demand {demand.demand_id} not met.")
     
+costs={}
+def output_costs(day):
+    for drone in drones:
+        costs[drone.id][day]['flight_time']=drone.flight_time
+        costs[drone.id][day]['resting_time']=14400-drone.flight_time
+        costs[drone.id][day]['charging_time']=drone.charging_time
+        costs[drone.id][day]['maintenance_variable_cost']=(drone.maintenance_variable_cost*drone.flight_time)/3600
+        costs[drone.id][day]['energy_cost']=(C*drone.battery_charged*drone.charging_time)/1000
