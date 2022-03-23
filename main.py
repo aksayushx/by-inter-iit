@@ -82,7 +82,7 @@ def read_item_details(path="./data/items.xlsx"):
 if sys.argv[1]=='1':
     demand_file=f"data/Scenario{sys.argv[1]}/Demand.csv"
 else:
-    demand_file=f"data/Scenario{sys.argv[1]}/Demand_Day{sys.argv[1]}.csv"
+    demand_file=f"data/Scenario{sys.argv[1]}/Demand_Day{sys.argv[2]}.csv"
 
 def read_demands(demands_path=demand_file):
 
@@ -684,6 +684,7 @@ for index,demand in enumerate(demands):
             last_time_taken = int(last_time_taken)
             time_counter = starting_time
             
+            print(demand.wh)
             print(wh_path)
             print(path)
             print(sec_path)
@@ -703,20 +704,23 @@ for index,demand in enumerate(demands):
                     drone.weights[time_counter] = drone.base_weight
                     drone.activity[time_counter] = "T-E"
                     time_counter += 1
-                
 
+            print("======", time_counter)    
+            # time_counter = starting_time
+            # print("======", time_counter)
             for index in range(180):
-                if time_counter - index < 0:
-                    print("******")
-                    break
-                drone.x_s[time_counter-index] = wh[demand.wh-1][0]
-                drone.y_s[time_counter-index] = wh[demand.wh-1][1]
-                drone.z_s[time_counter-index] = wh[demand.wh-1][2]
-                drone.speed_s[time_counter-index] = 0
-                drone.energy_mah[time_counter-index] = 0
-                drone.weights[time_counter-index] = drone.base_weight
-                drone.activity[time_counter-index] = "PU-WH"+str(demand.wh)
-
+                # if time_counter - index < 0:
+                #     print("******")
+                #     break
+                drone.x_s[time_counter] = wh[demand.wh-1][0]
+                drone.y_s[time_counter] = wh[demand.wh-1][1]
+                drone.z_s[time_counter] = wh[demand.wh-1][2]
+                drone.speed_s[time_counter] = 0
+                drone.energy_mah[time_counter] = 0
+                drone.weights[time_counter] = drone.base_weight
+                drone.activity[time_counter] = "PU-WH"+str(demand.wh)
+                time_counter += 1
+            print("======", time_counter)     
 
             for index in range(len(timewise_path)):
                 drone.x_s[time_counter] = timewise_path[index][0]
@@ -835,9 +839,9 @@ for index,demand in enumerate(demands):
             drone.energy_mah[charge_start_time+index] = 0
             drone.weights[charge_start_time+index] = drone.base_weight
             drone.activity[charge_start_time+index] = 'C-WH1'
-        # print(demand.wh)
-        # print(wh_path)
-        # print(path)
+        print(demand.wh)
+        print(wh_path)
+        print(path)
         (starting_time, energy, time_taken, timewise_path, timewise_energy, timewise_speed) = output_path(path, drone, demand)
         (starting_return_time, return_energy, return_time_taken, return_timewise_path, return_timewise_energy, return_timewise_speed) = output_path(path, drone, demand)
 
@@ -863,17 +867,22 @@ for index,demand in enumerate(demands):
                 drone.activity[time_counter] = "T-E"
                 time_counter += 1
 
+        print("======", time_counter) 
+        # time_counter = starting_time
+        # print("======", time_counter)
         for index in range(180):
-            if time_counter - index < 0:
-                break
-            drone.x_s[time_counter-index] = wh[demand.wh-1][0]
-            drone.y_s[time_counter-index] = wh[demand.wh-1][1]
-            drone.z_s[time_counter-index] = wh[demand.wh-1][2]
-            drone.speed_s[time_counter-index] = 0
-            drone.energy_mah[time_counter-index] = 0
-            drone.weights[time_counter-index] = drone.base_weight
-            drone.activity[time_counter-index] = "PU-WH"+str(demand.wh)
-
+            #if time_counter - index < 0:
+            #    break
+            drone.x_s[time_counter] = wh[demand.wh-1][0]
+            drone.y_s[time_counter] = wh[demand.wh-1][1]
+            drone.z_s[time_counter] = wh[demand.wh-1][2]
+            drone.speed_s[time_counter] = 0
+            drone.energy_mah[time_counter] = 0
+            drone.weights[time_counter] = drone.base_weight
+            drone.activity[time_counter] = "PU-WH"+str(demand.wh)
+            time_counter += 1
+        #time_counter += 1
+        print("======", time_counter) 
 
         for index in range(len(timewise_path)):
             drone.x_s[time_counter] = timewise_path[index][0]
@@ -903,6 +912,7 @@ for index,demand in enumerate(demands):
             drone.energy_mah[time_counter] = return_timewise_energy[index]
             drone.weights[time_counter] = drone.base_weight
             drone.activity[time_counter] = "T-E"
+            time_counter += 1
         break
     
     
@@ -972,10 +982,10 @@ def create_path_df(day):
                 z_coord.append(drone.z_s[j])
                 speed_vals.append(drone.speed_s[j])
                 energy_vals.append(drone.energy_mah[j])
-                if drone.activity[i] == "":
-                    drone.activity[i] = "R-WH1"
-                activities.append(drone.activity[i])
-                weights.append(drone.weights[i])
+                if drone.activity[j] == "":
+                    drone.activity[j] = "R-WH1"
+                activities.append(drone.activity[j])
+                weights.append(drone.weights[j])
 
             drone_ids.append(drone.id)
             days.append(day)
